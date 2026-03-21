@@ -1,0 +1,37 @@
+name: Deploy Lambda Webhook
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/webhook/**'
+      - 'libs/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build webhook
+        run: npx nx build webhook
+
+      - name: Install oss-serverless
+        run: npm install -g osls
+
+      - name: Deploy to AWS
+        working-directory: apps/webhook
+        run: osls deploy --stage prod
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: eu-west-1

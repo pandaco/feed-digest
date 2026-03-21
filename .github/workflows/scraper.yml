@@ -1,0 +1,64 @@
+name: InoReader Scraper
+
+on:
+  schedule:
+    - cron: '0 6 * * *'    # 07:00 Paris winter (UTC+1)
+    - cron: '0 5 * * *'    # 07:00 Paris summer (UTC+2)
+    - cron: '0 18 * * *'   # 19:00 Paris winter
+    - cron: '0 17 * * *'   # 19:00 Paris summer
+  workflow_dispatch:
+    inputs:
+      run_now:
+        description: 'Bypass timezone guard and run now'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Restore InoReader session
+        uses: actions/cache@v4
+        with:
+          path: session.json
+          key: inoreader-session-${{ github.run_id }}
+          restore-keys: |
+            inoreader-session-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Run scraper
+        run: npx nx serve scraper
+        env:
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          SUMMARY_LANG: ${{ secrets.SUMMARY_LANG }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          INOREADER_EMAIL: ${{ secrets.INOREADER_EMAIL }}
+          INOREADER_PASSWORD: ${{ secrets.INOREADER_PASSWORD }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DYNAMODB_TABLE_NAME: ${{ secrets.DYNAMODB_TABLE_NAME }}
+          AWS_REGION: eu-west-1
+          RUN_NOW: ${{ inputs.run_now || 'false' }}
+
+      - name: Save InoReader session
+        if: always()
+        uses: actions/cache@v4
+        with:
+          path: session.json
+          key: inoreader-session-${{ github.run_id }}

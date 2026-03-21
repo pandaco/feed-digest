@@ -1,0 +1,55 @@
+service: feed-digest
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: eu-west-1
+  stage: ${opt:stage, 'prod'}
+  environment:
+    TELEGRAM_BOT_TOKEN: ${ssm:/feed-digest/${self:provider.stage}/TELEGRAM_BOT_TOKEN}
+    TELEGRAM_SECRET_TOKEN: ${ssm:/feed-digest/${self:provider.stage}/TELEGRAM_SECRET_TOKEN}
+    TELEGRAM_CHAT_ID: ${ssm:/feed-digest/${self:provider.stage}/TELEGRAM_CHAT_ID}
+    GOOGLE_SHEET_ID: ${ssm:/feed-digest/${self:provider.stage}/GOOGLE_SHEET_ID, ""}
+    GOOGLE_SERVICE_ACCOUNT_JSON: ${ssm:/feed-digest/${self:provider.stage}/GOOGLE_SERVICE_ACCOUNT_JSON, ""}
+    STORAGE_BACKEND: ${ssm:/feed-digest/${self:provider.stage}/STORAGE_BACKEND, "google-sheets"}
+    NOTION_API_KEY: ${ssm:/feed-digest/${self:provider.stage}/NOTION_API_KEY, ""}
+    NOTION_INBOX_DB_ID: ${ssm:/feed-digest/${self:provider.stage}/NOTION_INBOX_DB_ID, ""}
+    NOTION_ALL_DB_ID: ${ssm:/feed-digest/${self:provider.stage}/NOTION_ALL_DB_ID, ""}
+    NOTION_SAVED_DB_ID: ${ssm:/feed-digest/${self:provider.stage}/NOTION_SAVED_DB_ID, ""}
+    DYNAMODB_TABLE_NAME: !Ref SessionsTable
+    SUMMARY_LANG: ${ssm:/feed-digest/${self:provider.stage}/SUMMARY_LANG}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:DeleteItem
+          Resource: !GetAtt SessionsTable.Arn
+
+functions:
+  webhook:
+    handler: main.handler
+    timeout: 29
+    events:
+      - httpApi:
+          path: /webhook
+          method: POST
+
+resources:
+  Resources:
+    SessionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: feed-digest-sessions-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: chatId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: chatId
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
