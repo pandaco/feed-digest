@@ -16,7 +16,6 @@
     ],
     "sharedGlobals": []
   },
-  "nxCloudId": "skip",
   "targetDefaults": {
     "build": {
       "cache": true,
