@@ -4,6 +4,8 @@
   "license": "MIT",
   "scripts": {
     "build": "npx nx run-many -t build",
+    "lint": "npx nx run-many -t lint",
+    "test": "npx nx run-many -t test",
     "webhook": "npx nx serve webhook",
     "scraper": "RUN_NOW=true npx nx serve scraper",
     "recover": "npx tsx --tsconfig tsconfig.base.json apps/scraper/src/recover.ts",
