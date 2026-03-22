@@ -5,7 +5,7 @@ export class GeminiAdapter implements LlmPort {
   private genAI: GoogleGenerativeAI;
   private readonly modelName: string;
 
-  constructor(apiKey: string, model: string = 'gemini-1.5-flash') {
+  constructor(apiKey: string, model = 'gemini-1.5-flash') {
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.modelName = model;
   }
@@ -84,7 +84,7 @@ export class GeminiAdapter implements LlmPort {
       // Even with responseMimeType, Gemini sometimes wraps with markdown
       const jsonString = content.replace(/```json|```/g, '').trim();
       return JSON.parse(jsonString);
-    } catch (e) {
+    } catch {
       console.warn('[GeminiAdapter] JSON parsing failed for response:', content);
       return this.fallback(title);
     }

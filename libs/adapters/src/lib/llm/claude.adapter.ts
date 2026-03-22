@@ -5,7 +5,7 @@ export class ClaudeAdapter implements LlmPort {
   private client: Anthropic;
   private readonly model: string;
 
-  constructor(apiKey: string, model: string = 'claude-3-5-sonnet-20240620') {
+  constructor(apiKey: string, model = 'claude-3-5-sonnet-20240620') {
     this.client = new Anthropic({ apiKey });
     this.model = model;
   }
@@ -77,7 +77,7 @@ export class ClaudeAdapter implements LlmPort {
       // Handle potential markdown code blocks
       const jsonString = content.replace(/```json|```/g, '').trim();
       return JSON.parse(jsonString);
-    } catch (e) {
+    } catch {
       console.warn('[ClaudeAdapter] JSON parsing failed for response:', content);
       return this.fallback(title);
     }
