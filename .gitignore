@@ -48,9 +48,10 @@ vitest.config.*.timestamp*
 .env.*
 !.env.example
 
-# Local session files
+# Local session and preference files
 session.json
 session-store.json
+tag-preferences.json
 
 # Documentation (local only)
 docs/
