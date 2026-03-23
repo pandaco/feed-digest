@@ -1,4 +1,4 @@
-import { NotifierPort, SessionPort, StoragePort } from '@feed-digest/core';
+import { NotifierPort, SessionPort, StoragePort, TagPreferencePort } from '@feed-digest/core';
 
 export interface HandleCallbackOptions {
   callbackQuery: any;
@@ -6,6 +6,7 @@ export interface HandleCallbackOptions {
   storage: StoragePort;
   notifier: NotifierPort;
   summaryLang: string;
+  tagPreference?: TagPreferencePort;
 }
 
 /**
@@ -13,7 +14,7 @@ export interface HandleCallbackOptions {
  * Handles tag toggling and final validation/filtering.
  */
 export async function handleCallback(options: HandleCallbackOptions): Promise<void> {
-  const { callbackQuery, session, storage, notifier, summaryLang } = options;
+  const { callbackQuery, session, storage, notifier, summaryLang, tagPreference } = options;
   const chatId = callbackQuery.message?.chat.id.toString();
   const messageId = callbackQuery.message?.message_id.toString();
   const data = callbackQuery.data;
@@ -69,6 +70,16 @@ export async function handleCallback(options: HandleCallbackOptions): Promise<vo
     }
 
     const totalKept = allArticleIds.size - articlesToDelete.size;
+
+    // Record tag preferences for learning
+    if (tagPreference) {
+      const selections: Record<string, boolean> = {};
+      for (const [tagName, state] of Object.entries(currentSession.tags)) {
+        selections[tagName] = state.selected;
+      }
+      await tagPreference.record(chatId, selections);
+      console.log(`[Pipeline] Tag preferences recorded for chatId: ${chatId}`);
+    }
 
     // Cleanup session and notify
     await session.delete(chatId);

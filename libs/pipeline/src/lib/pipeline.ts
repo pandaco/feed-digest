@@ -6,6 +6,7 @@ import {
   ScraperPort,
   SessionPort,
   StoragePort,
+  TagPreferencePort,
   TelegramSession
 } from '@feed-digest/core';
 
@@ -23,6 +24,7 @@ export interface RunPipelineOptions {
   concurrency?: number;
   minDelayMs?: number;
   maxDelayMs?: number;
+  tagPreference?: TagPreferencePort;
 }
 
 const LANGUAGE_MAP: Record<string, string> = { fr: 'French', en: 'English' };
@@ -76,12 +78,20 @@ async function enrichAndSave(
   return article;
 }
 
-export function buildNotificationData(articles: Article[]) {
+export interface BuildNotificationDataOptions {
+  articles: Article[];
+  tagPreference?: TagPreferencePort;
+  chatId?: string;
+}
+
+export async function buildNotificationData(options: BuildNotificationDataOptions) {
+  const { articles, tagPreference, chatId } = options;
   const tagCounts: Record<string, number> = {};
   const sourceCounts: Record<string, number> = {};
   const sessionTags: TelegramSession['tags'] = {};
   const articleCache: TelegramSession['articles'] = {};
   const savedArticles: { title: string; url: string }[] = [];
+  const preSelected: Record<string, boolean> = {};
 
   for (const article of articles) {
     articleCache[article.id] = { title: article.title, url: article.url };
@@ -98,11 +108,39 @@ export function buildNotificationData(articles: Article[]) {
     }
   }
 
+  // Compute pre-selection from learned preferences
+  const threshold = parseFloat(process.env['TAG_PREFERENCE_THRESHOLD'] || '0.6');
+  const minRuns = parseInt(process.env['TAG_PREFERENCE_MIN_RUNS'] || '3', 10);
+
+  if (tagPreference && chatId) {
+    const prefs = await tagPreference.get(chatId);
+    if (prefs) {
+      for (const tag of Object.keys(sessionTags)) {
+        const stats = prefs.tags[tag];
+        if (stats && stats.presentedCount >= minRuns) {
+          const score = stats.selectionCount / stats.presentedCount;
+          if (score >= threshold) {
+            preSelected[tag] = true;
+            sessionTags[tag].selected = true;
+          }
+        }
+      }
+    }
+  }
+
+  // Sort: pre-selected first, then by frequency
   const tagOrder = Object.entries(tagCounts)
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => {
+      const aSelected = preSelected[a[0]] ? 1 : 0;
+      const bSelected = preSelected[b[0]] ? 1 : 0;
+      if (aSelected !== bSelected) return bSelected - aSelected;
+      return b[1] - a[1];
+    })
     .map(entry => entry[0]);
 
-  return { tagCounts, sourceCounts, sessionTags, articleCache, savedArticles, tagOrder };
+  const preSelectedCount = Object.keys(preSelected).length;
+
+  return { tagCounts, sourceCounts, sessionTags, articleCache, savedArticles, tagOrder, preSelected, preSelectedCount };
 }
 
 async function sendNotifications(
@@ -112,8 +150,12 @@ async function sendNotifications(
   runAtDate: Date,
   runSynthesis: string | null,
 ) {
-  const { tagCounts, sourceCounts, savedArticles, tagOrder, sessionTags, articleCache } =
-    buildNotificationData(articles);
+  const { tagCounts, sourceCounts, savedArticles, tagOrder, sessionTags, articleCache, preSelected, preSelectedCount } =
+    await buildNotificationData({
+      articles,
+      tagPreference: options.tagPreference,
+      chatId: options.telegramChatId,
+    });
 
   const runLabel = new Date().getHours() < 12 ? 'morning' : 'evening';
 
@@ -134,7 +176,16 @@ async function sendNotifications(
     await options.notifier.sendSynthesis(runSynthesis, options.summaryLang);
   }
 
-  const messageId = await options.notifier.sendTagSelection(tagCounts, options.summaryLang);
+  const hasPreSelected = Object.keys(preSelected).length > 0;
+  const messageId = await options.notifier.sendTagSelection(
+    tagCounts,
+    options.summaryLang,
+    hasPreSelected ? preSelected : undefined,
+  );
+
+  if (preSelectedCount > 0) {
+    console.log(`[Pipeline] Pre-selected ${preSelectedCount} tags based on learned preferences`);
+  }
 
   if (savedArticles.length > 0) {
     await options.notifier.sendSavedArticles(savedArticles, options.summaryLang);

@@ -58,7 +58,7 @@ async function sendRecoveryNotification(
 
   const runSynthesis = await llm.summarizeRun(articles, languageName);
   const { tagCounts, sourceCounts, sessionTags, articleCache, tagOrder } =
-    buildNotificationData(articles);
+    await buildNotificationData({ articles });
 
   const recoveryDate = new Date();
   const runLabel = recoveryDate.getHours() < 12 ? 'morning' : 'evening';
