@@ -89,9 +89,9 @@ export class TelegramAdapter implements NotifierPort {
     });
   }
 
-  async sendTagSelection(tagCounts: Record<string, number>, language: string): Promise<string> {
+  async sendTagSelection(tagCounts: Record<string, number>, language: string, preSelected?: Record<string, boolean>): Promise<string> {
     const i18n = this.messages[language] || this.messages['fr'];
-    const keyboard = this.buildKeyboard(tagCounts, i18n.validate);
+    const keyboard = this.buildKeyboard(tagCounts, i18n.validate, preSelected);
 
     const sentMessage = await this.bot.sendMessage(this.chatId, i18n.selectToKeep, {
       parse_mode: 'HTML',
@@ -171,9 +171,16 @@ export class TelegramAdapter implements NotifierPort {
     await this.bot.sendMessage(this.chatId, i18n.error(message));
   }
 
-  private buildKeyboard(tagCounts: Record<string, number>, validateLabel: string): TelegramBot.InlineKeyboardButton[][] {
+  private buildKeyboard(tagCounts: Record<string, number>, validateLabel: string, preSelected?: Record<string, boolean>): TelegramBot.InlineKeyboardButton[][] {
     const sortedTags = Object.entries(tagCounts)
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => {
+        if (preSelected) {
+          const aSelected = preSelected[a[0]] ? 1 : 0;
+          const bSelected = preSelected[b[0]] ? 1 : 0;
+          if (aSelected !== bSelected) return bSelected - aSelected;
+        }
+        return b[1] - a[1];
+      })
       .map(entry => entry[0]);
 
     const keyboard: TelegramBot.InlineKeyboardButton[][] = [];
@@ -182,10 +189,14 @@ export class TelegramAdapter implements NotifierPort {
 
     for (let i = 0; i < sortedTags.length && i < 96; i += 2) {
       const row: TelegramBot.InlineKeyboardButton[] = [];
-      row.push({ text: `⬜️ ${sortedTags[i]}`, callback_data: `toggle:${sortedTags[i]}` });
+      const tag1 = sortedTags[i];
+      const icon1 = preSelected?.[tag1] ? '✅' : '⬜️';
+      row.push({ text: `${icon1} ${tag1}`, callback_data: `toggle:${tag1}` });
 
       if (i + 1 < sortedTags.length) {
-        row.push({ text: `⬜️ ${sortedTags[i + 1]}`, callback_data: `toggle:${sortedTags[i + 1]}` });
+        const tag2 = sortedTags[i + 1];
+        const icon2 = preSelected?.[tag2] ? '✅' : '⬜️';
+        row.push({ text: `${icon2} ${tag2}`, callback_data: `toggle:${tag2}` });
       }
       keyboard.push(row);
     }
