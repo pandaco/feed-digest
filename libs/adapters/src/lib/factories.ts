@@ -1,10 +1,12 @@
-import { LlmPort, StoragePort, SessionPort } from '@feed-digest/core';
+import { LlmPort, StoragePort, SessionPort, TagPreferencePort } from '@feed-digest/core';
 import { GoogleSheetsAdapter } from './storage/google-sheets.adapter';
 import { NotionAdapter } from './storage/notion.adapter';
 import { ClaudeAdapter } from './llm/claude.adapter';
 import { GeminiAdapter } from './llm/gemini.adapter';
 import { DynamoDbAdapter } from './session/dynamodb.adapter';
 import { FileSessionAdapter } from './session/in-memory-session.adapter';
+import { DynamoDbTagPreferenceAdapter } from './tag-preference/dynamodb-tag-preference.adapter';
+import { FileTagPreferenceAdapter } from './tag-preference/file-tag-preference.adapter';
 
 export function createStorage(label = 'App'): StoragePort {
   const backend = process.env['STORAGE_BACKEND'] || 'google-sheets';
@@ -44,5 +46,14 @@ export function createSession(): SessionPort {
     : new DynamoDbAdapter({
         region: process.env['AWS_REGION'] || 'eu-west-1',
         tableName: process.env['DYNAMODB_TABLE_NAME']!,
+      });
+}
+
+export function createTagPreference(): TagPreferencePort {
+  return process.env['NODE_ENV'] === 'development'
+    ? new FileTagPreferenceAdapter()
+    : new DynamoDbTagPreferenceAdapter({
+        region: process.env['AWS_REGION'] || 'eu-west-1',
+        tableName: process.env['DYNAMODB_TAG_PREF_TABLE_NAME']!,
       });
 }
