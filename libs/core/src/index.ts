@@ -6,3 +6,5 @@ export * from './lib/session.port';
 export * from './lib/article';
 export * from './lib/session';
 export * from './lib/id-generator';
+export * from './lib/tag-preference';
+export * from './lib/tag-preference.port';

@@ -44,7 +44,7 @@ export interface NotifierPort {
    * Sends the tag selection message with inline keyboard buttons.
    * @returns The unique ID of the sent message (for callback handling).
    */
-  sendTagSelection(tagCounts: Record<string, number>, language: string): Promise<string>;
+  sendTagSelection(tagCounts: Record<string, number>, language: string, preSelected?: Record<string, boolean>): Promise<string>;
 
   /**
    * Updates the inline keyboard buttons of an existing tag selection message.
