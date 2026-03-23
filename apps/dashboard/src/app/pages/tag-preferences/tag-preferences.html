@@ -1,0 +1,104 @@
+<div class="container">
+  <h1>Tag Preferences</h1>
+
+  <section class="config-section">
+    <div class="field">
+      <label for="token">API Token</label>
+      <input
+        id="token"
+        type="password"
+        [ngModel]="storedToken"
+        (ngModelChange)="saveToken($event)"
+        placeholder="TELEGRAM_SECRET_TOKEN"
+      />
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="chatId">Chat ID</label>
+        <input
+          id="chatId"
+          type="text"
+          [ngModel]="chatId()"
+          (ngModelChange)="chatId.set($event)"
+          placeholder="Telegram chat ID"
+        />
+      </div>
+      <button class="btn btn-primary" (click)="loadPreferences()" [disabled]="loading()">
+        {{ loading() ? 'Loading...' : 'Load' }}
+      </button>
+    </div>
+  </section>
+
+  @if (error()) {
+    <div class="alert alert-error">{{ error() }}</div>
+  }
+
+  @if (data()) {
+    <section class="stats-section">
+      <div class="stat-card">
+        <span class="stat-value">{{ tags().length }}</span>
+        <span class="stat-label">Tags tracked</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ autoSelectedCount() }}</span>
+        <span class="stat-label">Auto-selected</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ formatScore(threshold()) }}</span>
+        <span class="stat-label">Threshold</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ minRuns() }}</span>
+        <span class="stat-label">Min runs</span>
+      </div>
+    </section>
+
+    <section class="table-section">
+      <div class="table-header">
+        <h2>Tag Details</h2>
+        <button class="btn btn-danger" (click)="resetPreferences()">Reset All</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Tag</th>
+            <th>Score</th>
+            <th>Selected</th>
+            <th>Presented</th>
+            <th>Auto</th>
+            <th>Last Selected</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (tag of tags(); track tag.name) {
+            <tr [class.auto-selected]="tag.autoSelected">
+              <td class="tag-name">{{ tag.name }}</td>
+              <td>
+                <div class="score-bar">
+                  <div
+                    class="score-fill"
+                    [class.above-threshold]="tag.autoSelected"
+                    [style.width]="formatScore(tag.score)"
+                  ></div>
+                  <span class="score-label">{{ formatScore(tag.score) }}</span>
+                </div>
+              </td>
+              <td class="center">{{ tag.selectionCount }}</td>
+              <td class="center">{{ tag.presentedCount }}</td>
+              <td class="center">
+                @if (tag.autoSelected) {
+                  <span class="badge badge-success">Yes</span>
+                } @else {
+                  <span class="badge badge-neutral">No</span>
+                }
+              </td>
+              <td>{{ formatDate(tag.lastSelectedAt) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  }
+</div>

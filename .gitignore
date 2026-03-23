@@ -54,3 +54,7 @@ session-store.json
 
 # Documentation (local only)
 docs/
+
+.angular
+
+__screenshots__/
