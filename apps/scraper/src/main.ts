@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv';
-import { InoreaderAdapter, TelegramAdapter, createStorage, createLlm, createSession } from '@feed-digest/adapters';
+import { InoreaderAdapter, TelegramAdapter, createStorage, createLlm, createSession, createTagPreference } from '@feed-digest/adapters';
 import { runPipeline } from '@feed-digest/pipeline';
 import { ScraperPort } from '@feed-digest/core';
 
@@ -43,6 +43,7 @@ async function main() {
   const storage = createStorage('Main');
   const { llm, provider: llmProvider } = createLlm('Main');
   const session = createSession();
+  const tagPreference = createTagPreference();
   const notifier = new TelegramAdapter({
     token: process.env['TELEGRAM_BOT_TOKEN']!,
     chatId: process.env['TELEGRAM_CHAT_ID']!,
@@ -57,6 +58,7 @@ async function main() {
       storage,
       notifier,
       session,
+      tagPreference,
       summaryLang,
       llmProvider,
       telegramChatId: process.env['TELEGRAM_CHAT_ID']!,
