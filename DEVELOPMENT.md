@@ -51,6 +51,9 @@ Fill in the following variables in `.env`:
 - `SHOW_BROWSER` (set to `true` to show Playwright browser window)
 - `RUN_NOW` (set to `true` to bypass the Paris time window guard)
 - `DYNAMODB_TABLE_NAME` (optional for local, see below)
+- `DYNAMODB_TAG_PREF_TABLE_NAME` (optional for local, see below)
+- `TAG_PREFERENCE_THRESHOLD` (default: `0.6` — minimum score for auto-selection)
+- `TAG_PREFERENCE_MIN_RUNS` (default: `3` — minimum presentations before auto-selection kicks in)
 
 ---
 
@@ -69,7 +72,7 @@ RUN_NOW=true npx tsx --tsconfig tsconfig.base.json apps/scraper/src/main.ts
 npm run scraper
 ```
 
-> **Note**: In `development` mode (`NODE_ENV=development` in your `.env`), the scraper uses a **local file** (`session-store.json`) instead of AWS DynamoDB to store the session. This allows you to test the entire pipeline without an AWS account.
+> **Note**: In `development` mode (`NODE_ENV=development` in your `.env`), the scraper uses **local files** instead of AWS DynamoDB: `session-store.json` for the session and `tag-preferences.json` for learned tag preferences. This allows you to test the entire pipeline without an AWS account.
 
 ---
 
@@ -139,7 +142,50 @@ Set `NOTION_INBOX_DB_ID`, `NOTION_ALL_DB_ID`, and `NOTION_SAVED_DB_ID` in `.env`
 
 ---
 
-## 5. Working without DynamoDB Locally
+## 5. Tag Preference Learning
+
+The system learns from your tag selections to auto-check your favorite tags in future runs.
+
+**How it works:**
+- Each time you validate a tag selection, the system records which tags were selected and which were not.
+- A score is computed for each tag: `selectionCount / presentedCount`.
+- When the score exceeds the threshold (`TAG_PREFERENCE_THRESHOLD`, default `0.6`) and the tag has been presented enough times (`TAG_PREFERENCE_MIN_RUNS`, default `3`), the tag is automatically pre-checked in the Telegram keyboard.
+- Pre-checked tags appear first in the list, sorted by frequency.
+- You can always toggle tags manually before validating.
+
+**Local development:** preferences are stored in `tag-preferences.json` at the project root.
+**Production:** preferences are stored in a dedicated DynamoDB table (`DYNAMODB_TAG_PREF_TABLE_NAME`).
+
+---
+
+## 6. Dashboard (Angular)
+
+The dashboard is a standalone Angular web application for visualizing and managing tag preferences.
+
+### Running locally
+```bash
+npx nx serve dashboard
+```
+The app will be available at `http://localhost:4200`.
+
+### Features
+- View all tracked tags with their selection scores (progress bars)
+- See which tags are auto-selected based on the current threshold
+- Reset all preferences for a chat ID
+
+### API Endpoints
+The dashboard connects to the webhook Lambda's REST API:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/preferences/:chatId` | Get preferences with computed scores |
+| `DELETE` | `/api/preferences/:chatId` | Reset all preferences |
+
+All API calls require the `x-telegram-bot-api-secret-token` header.
+
+---
+
+## 7. Working without DynamoDB Locally
 
 If you want to test the `DynamoDbAdapter` locally:
 1. **Install DynamoDB Local**: Use Docker: `docker run -p 8000:8000 amazon/dynamodb-local`.
@@ -147,7 +193,7 @@ If you want to test the `DynamoDbAdapter` locally:
 
 ---
 
-## 6. Production Configuration (AWS & GitHub)
+## 8. Production Configuration (AWS & GitHub)
 
 ### 6.1 AWS SSM Parameters (One-time)
 Populate your production secrets in AWS SSM (SecureString):
@@ -174,7 +220,7 @@ Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployme
 
 ---
 
-## 7. Project Architecture Reminder
+## 9. Project Architecture Reminder
 - **libs/core**: Pure domain logic, models, and port interfaces. No external dependencies.
 - **libs/adapters**: Concrete implementations:
   - `scraper/inoreader.adapter.ts` — InoReader scraping via Playwright
@@ -183,5 +229,8 @@ Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployme
   - `llm/claude.adapter.ts` / `llm/gemini.adapter.ts` — LLM enrichment
   - `notifier/telegram.adapter.ts` — Telegram notifications
   - `session/dynamodb.adapter.ts` / `session/in-memory-session.adapter.ts` — Session persistence
+  - `tag-preference/dynamodb-tag-preference.adapter.ts` / `tag-preference/file-tag-preference.adapter.ts` — Tag preference learning
 - **libs/pipeline**: Orchestration (the "Glue") between the ports.
-- **apps/**: Entry points (CLI for scraper, Lambda for webhook).
+- **apps/scraper**: CLI entry point (composition root).
+- **apps/webhook**: AWS Lambda handler for Telegram callbacks + Preferences REST API.
+- **apps/dashboard**: Angular web UI for tag preference management.

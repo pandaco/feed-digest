@@ -94,3 +94,6 @@ The **Chat ID** is the unique number of *your* account. This allows the bot to k
 | `GOOGLE_SHEET_ID` | Spreadsheet URL | `1_ABC_..._XYZ` |
 | `TELEGRAM_CHAT_ID` | @userinfobot on Telegram | `123456789` |
 | `TELEGRAM_BOT_TOKEN` | @BotFather on Telegram | `123456:ABC-DEF` |
+| `DYNAMODB_TAG_PREF_TABLE_NAME` | AWS DynamoDB table name | `feed-digest-tag-prefs` |
+| `TAG_PREFERENCE_THRESHOLD` | Auto-selection score threshold | `0.6` |
+| `TAG_PREFERENCE_MIN_RUNS` | Minimum runs before auto-selection | `3` |

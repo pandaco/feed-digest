@@ -14,9 +14,11 @@ libs/adapters/      Concrete implementations
   llm/              ClaudeAdapter, GeminiAdapter
   notifier/         TelegramAdapter
   session/          DynamoDbAdapter, FileSessionAdapter
+  tag-preference/   DynamoDbTagPreferenceAdapter, FileTagPreferenceAdapter
 libs/pipeline/      Pipeline orchestration
 apps/scraper/       CLI entry point (composition root)
-apps/webhook/       AWS Lambda handler for Telegram callbacks
+apps/webhook/       AWS Lambda handler for Telegram callbacks + Preferences API
+apps/dashboard/     Angular web UI for tag preference management
 ```
 
 ## Local setup
@@ -58,6 +60,9 @@ npm run webhook
 | `MAX_TAGS` | Max tags per article | `3` |
 | `SHOW_BROWSER` | Show Playwright browser | `false` |
 | `RUN_NOW` | Bypass Paris time window | `false` |
+| `DYNAMODB_TAG_PREF_TABLE_NAME` | DynamoDB table for tag preferences (prod) | - |
+| `TAG_PREFERENCE_THRESHOLD` | Score above which a tag is auto-selected | `0.6` |
+| `TAG_PREFERENCE_MIN_RUNS` | Minimum presentations before auto-selection | `3` |
 
 ## Pipeline flow
 
@@ -68,8 +73,9 @@ npm run webhook
    - Run summary (stats, duration)
    - Statistics by RSS source
    - AI synthesis of trends
-   - Interactive tag selection (inline buttons)
+   - Interactive tag selection (inline buttons, with learned favorites pre-checked)
    - List of saved articles (if applicable)
 5. **Filtering**: user selects tags to keep via Telegram
+6. **Preference learning**: tag selections are recorded to auto-select favorites in future runs
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for the full development guide.
