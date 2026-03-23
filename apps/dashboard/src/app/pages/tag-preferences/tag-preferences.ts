@@ -20,7 +20,8 @@ interface TagRow {
 export class TagPreferencesComponent {
   private service = inject(TagPreferenceService);
 
-  chatId = signal('');
+  apiToken = signal(localStorage.getItem('apiToken') || '');
+  chatId = signal(localStorage.getItem('chatId') || '');
   loading = signal(false);
   error = signal<string | null>(null);
   data = signal<TagPreferenceResponse | null>(null);
@@ -101,10 +102,12 @@ export class TagPreferencesComponent {
   }
 
   saveToken(token: string): void {
+    this.apiToken.set(token);
     localStorage.setItem('apiToken', token);
   }
 
-  get storedToken(): string {
-    return localStorage.getItem('apiToken') || '';
+  saveChatId(id: string): void {
+    this.chatId.set(id);
+    localStorage.setItem('chatId', id);
   }
 }

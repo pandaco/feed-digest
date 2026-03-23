@@ -84,10 +84,18 @@ export class NotionAdapter implements StoragePort {
           continue;
         }
 
-        await this.client.pages.update({
-          page_id: page.id,
-          in_trash: true,
-        });
+        try {
+          await this.client.pages.update({
+            page_id: page.id,
+            in_trash: true,
+          });
+        } catch (err: any) {
+          if (err?.code === 'validation_error' && err?.message?.includes('archived')) {
+            console.log(`[NotionAdapter] Page ${page.id} was archived concurrently, skipping.`);
+          } else {
+            throw err;
+          }
+        }
       }
     }
 

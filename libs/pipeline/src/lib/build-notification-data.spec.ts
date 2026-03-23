@@ -30,14 +30,9 @@ function createMockTagPreference(prefs: TagPreference | null): TagPreferencePort
 }
 
 describe('buildNotificationData', () => {
-  const originalEnv = process.env;
-
-  beforeEach(() => {
-    process.env = { ...originalEnv };
-  });
-
   afterEach(() => {
-    process.env = originalEnv;
+    delete process.env['TAG_PREFERENCE_THRESHOLD'];
+    delete process.env['TAG_PREFERENCE_MIN_RUNS'];
   });
 
   it('should work without tag preferences', async () => {

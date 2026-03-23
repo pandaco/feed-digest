@@ -7,7 +7,7 @@
       <input
         id="token"
         type="password"
-        [ngModel]="storedToken"
+        [ngModel]="apiToken()"
         (ngModelChange)="saveToken($event)"
         placeholder="TELEGRAM_SECRET_TOKEN"
       />
@@ -20,7 +20,7 @@
           id="chatId"
           type="text"
           [ngModel]="chatId()"
-          (ngModelChange)="chatId.set($event)"
+          (ngModelChange)="saveChatId($event)"
           placeholder="Telegram chat ID"
         />
       </div>
