@@ -37,10 +37,12 @@ export async function handleCallback(options: HandleCallbackOptions): Promise<vo
       
       // Update the main keyboard UI
       const buttonState: Record<string, boolean> = {};
+      const tagCounts: Record<string, number> = {};
       for (const [name, state] of Object.entries(currentSession.tags)) {
         buttonState[name] = state.selected;
+        tagCounts[name] = state.articleIds.length;
       }
-      await notifier.updateButtons(messageId, buttonState, currentSession.tagOrder);
+      await notifier.updateButtons(messageId, buttonState, currentSession.tagOrder, tagCounts);
     }
     return;
   }

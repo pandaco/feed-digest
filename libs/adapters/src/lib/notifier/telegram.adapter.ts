@@ -101,7 +101,7 @@ export class TelegramAdapter implements NotifierPort {
     return sentMessage.message_id.toString();
   }
 
-  async updateButtons(messageId: string, tags: Record<string, boolean>, tagOrder?: string[]): Promise<void> {
+  async updateButtons(messageId: string, tags: Record<string, boolean>, tagOrder?: string[], tagCounts?: Record<string, number>): Promise<void> {
     const i18n = this.messages['fr'];
 
     const sortedKeys = tagOrder && tagOrder.length > 0
@@ -115,11 +115,13 @@ export class TelegramAdapter implements NotifierPort {
     for (let i = 0; i < sortedKeys.length && i < 96; i += 2) {
       const row: TelegramBot.InlineKeyboardButton[] = [];
       const tag1 = sortedKeys[i];
-      row.push({ text: `${tags[tag1] ? '✅' : '⬜️'} ${tag1}`, callback_data: `toggle:${tag1}` });
+      const icon1 = tags[tag1] ? '✅' : '⬜️';
+      row.push({ text: this.buildTagLabel(icon1, tag1, tagCounts?.[tag1]), callback_data: `toggle:${tag1}` });
 
       if (i + 1 < sortedKeys.length) {
         const tag2 = sortedKeys[i + 1];
-        row.push({ text: `${tags[tag2] ? '✅' : '⬜️'} ${tag2}`, callback_data: `toggle:${tag2}` });
+        const icon2 = tags[tag2] ? '✅' : '⬜️';
+        row.push({ text: this.buildTagLabel(icon2, tag2, tagCounts?.[tag2]), callback_data: `toggle:${tag2}` });
       }
       keyboard.push(row);
     }
@@ -171,6 +173,10 @@ export class TelegramAdapter implements NotifierPort {
     await this.bot.sendMessage(this.chatId, i18n.error(message));
   }
 
+  private buildTagLabel(icon: string, tag: string, count?: number): string {
+    return count !== undefined ? `${icon} ${tag} (${count})` : `${icon} ${tag}`;
+  }
+
   private buildKeyboard(tagCounts: Record<string, number>, validateLabel: string, preSelected?: Record<string, boolean>): TelegramBot.InlineKeyboardButton[][] {
     const sortedTags = Object.entries(tagCounts)
       .sort((a, b) => {
@@ -191,12 +197,12 @@ export class TelegramAdapter implements NotifierPort {
       const row: TelegramBot.InlineKeyboardButton[] = [];
       const tag1 = sortedTags[i];
       const icon1 = preSelected?.[tag1] ? '✅' : '⬜️';
-      row.push({ text: `${icon1} ${tag1}`, callback_data: `toggle:${tag1}` });
+      row.push({ text: this.buildTagLabel(icon1, tag1, tagCounts[tag1]), callback_data: `toggle:${tag1}` });
 
       if (i + 1 < sortedTags.length) {
         const tag2 = sortedTags[i + 1];
         const icon2 = preSelected?.[tag2] ? '✅' : '⬜️';
-        row.push({ text: `${icon2} ${tag2}`, callback_data: `toggle:${tag2}` });
+        row.push({ text: this.buildTagLabel(icon2, tag2, tagCounts[tag2]), callback_data: `toggle:${tag2}` });
       }
       keyboard.push(row);
     }

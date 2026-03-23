@@ -49,7 +49,7 @@ export interface NotifierPort {
   /**
    * Updates the inline keyboard buttons of an existing tag selection message.
    */
-  updateButtons(messageId: string, tags: Record<string, boolean>, tagOrder?: string[]): Promise<void>;
+  updateButtons(messageId: string, tags: Record<string, boolean>, tagOrder?: string[], tagCounts?: Record<string, number>): Promise<void>;
 
   /**
    * Sends a final confirmation message after the user validates their selection.
