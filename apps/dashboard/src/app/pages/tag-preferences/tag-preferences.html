@@ -37,27 +37,65 @@
   @if (data()) {
     <section class="stats-section">
       <div class="stat-card">
-        <span class="stat-value">{{ tags().length }}</span>
-        <span class="stat-label">Tags tracked</span>
+        <span class="stat-value">{{ runCount() }}</span>
+        <span class="stat-label">Runs</span>
       </div>
       <div class="stat-card">
-        <span class="stat-value">{{ autoSelectedCount() }}</span>
-        <span class="stat-label">Auto-selected</span>
+        <span class="stat-value">{{ allTags().length }}</span>
+        <span class="stat-label">Tags</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ autoCount() }}</span>
+        <span class="stat-label">Auto</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ filteredCount() }}</span>
+        <span class="stat-label">Filtered</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value">{{ formatScore(avgSelectionRate()) }}</span>
+        <span class="stat-label">Avg select</span>
       </div>
       <div class="stat-card">
         <span class="stat-value">{{ formatScore(threshold()) }}</span>
         <span class="stat-label">Threshold</span>
       </div>
-      <div class="stat-card">
-        <span class="stat-value">{{ minRuns() }}</span>
-        <span class="stat-label">Min runs</span>
-      </div>
     </section>
 
     <section class="table-section">
       <div class="table-header">
-        <h2>Tag Details</h2>
-        <button class="btn btn-danger" (click)="resetPreferences()">Reset All</button>
+        <div class="filter-tabs">
+          <button
+            class="filter-tab"
+            [class.active]="activeFilter() === 'all'"
+            (click)="setFilter('all')"
+          >All ({{ allTags().length }})</button>
+          <button
+            class="filter-tab"
+            [class.active]="activeFilter() === 'auto'"
+            (click)="setFilter('auto')"
+          >Auto ({{ autoCount() }})</button>
+          <button
+            class="filter-tab"
+            [class.active]="activeFilter() === 'default'"
+            (click)="setFilter('default')"
+          >Default ({{ defaultCount() }})</button>
+          <button
+            class="filter-tab"
+            [class.active]="activeFilter() === 'filtered'"
+            (click)="setFilter('filtered')"
+          >Filtered ({{ filteredCount() }})</button>
+        </div>
+        <div class="table-actions">
+          <input
+            class="search-input"
+            type="text"
+            placeholder="Search tags..."
+            [ngModel]="searchQuery()"
+            (ngModelChange)="searchQuery.set($event)"
+          />
+          <button class="btn btn-danger" (click)="resetPreferences()">Reset All</button>
+        </div>
       </div>
 
       <table>
@@ -67,19 +105,19 @@
             <th>Score</th>
             <th>Selected</th>
             <th>Presented</th>
-            <th>Auto</th>
+            <th>State</th>
             <th>Last Selected</th>
           </tr>
         </thead>
         <tbody>
           @for (tag of tags(); track tag.name) {
-            <tr [class.auto-selected]="tag.autoSelected">
+            <tr [class]="'row-' + tag.state">
               <td class="tag-name">{{ tag.name }}</td>
               <td>
                 <div class="score-bar">
                   <div
                     class="score-fill"
-                    [class.above-threshold]="tag.autoSelected"
+                    [class]="'fill-' + tag.state"
                     [style.width]="formatScore(tag.score)"
                   ></div>
                   <span class="score-label">{{ formatScore(tag.score) }}</span>
@@ -88,11 +126,16 @@
               <td class="center">{{ tag.selectionCount }}</td>
               <td class="center">{{ tag.presentedCount }}</td>
               <td class="center">
-                @if (tag.autoSelected) {
-                  <span class="badge badge-success">Yes</span>
-                } @else {
-                  <span class="badge badge-neutral">No</span>
-                }
+                <select
+                  class="state-select"
+                  [class]="'state-select select-' + tag.state"
+                  [ngModel]="tag.state"
+                  (ngModelChange)="changeState(tag, $event)"
+                >
+                  <option value="auto">Auto</option>
+                  <option value="default">Default</option>
+                  <option value="filtered">Filtered</option>
+                </select>
               </td>
               <td>{{ formatDate(tag.lastSelectedAt) }}</td>
             </tr>

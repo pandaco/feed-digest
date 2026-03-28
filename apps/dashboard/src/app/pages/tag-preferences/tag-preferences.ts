@@ -1,6 +1,9 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TagPreferenceService, TagPreferenceResponse } from '../../services/tag-preference.service';
+import { TagPreferenceService, TagPreferenceResponse, TagOverride } from '../../services/tag-preference.service';
+
+type TagState = 'auto' | 'filtered' | 'default';
+type FilterTab = 'all' | TagState;
 
 interface TagRow {
   name: string;
@@ -8,6 +11,7 @@ interface TagRow {
   presentedCount: number;
   score: number;
   autoSelected: boolean;
+  state: TagState;
   lastSelectedAt?: string;
 }
 
@@ -25,30 +29,64 @@ export class TagPreferencesComponent {
   loading = signal(false);
   error = signal<string | null>(null);
   data = signal<TagPreferenceResponse | null>(null);
+  activeFilter = signal<FilterTab>('all');
+  searchQuery = signal('');
 
   threshold = computed(() => this.data()?.threshold ?? 0.6);
   minRuns = computed(() => this.data()?.minRuns ?? 3);
+  runCount = computed(() => this.data()?.runCount ?? 0);
 
-  tags = computed<TagRow[]>(() => {
+  allTags = computed<TagRow[]>(() => {
     const d = this.data();
     if (!d) return [];
+
+    const overrides = d.tagOverrides ?? {};
 
     return Object.entries(d.tags)
       .map(([name, stats]) => {
         const scoreInfo = d.scores[name];
+        const override = overrides[name] as TagOverride | undefined;
+        let state: TagState = 'default';
+        if (override === 'filtered') {
+          state = 'filtered';
+        } else if (override === 'auto' || scoreInfo?.autoSelected) {
+          state = 'auto';
+        }
         return {
           name,
           selectionCount: stats.selectionCount,
           presentedCount: stats.presentedCount,
           score: scoreInfo?.score ?? 0,
           autoSelected: scoreInfo?.autoSelected ?? false,
+          state,
           lastSelectedAt: stats.lastSelectedAt,
         };
       })
       .sort((a, b) => b.score - a.score);
   });
 
-  autoSelectedCount = computed(() => this.tags().filter(t => t.autoSelected).length);
+  tags = computed(() => {
+    const filter = this.activeFilter();
+    const query = this.searchQuery().toLowerCase().trim();
+    let result = this.allTags();
+    if (filter !== 'all') result = result.filter(t => t.state === filter);
+    if (query) result = result.filter(t => t.name.toLowerCase().includes(query));
+    return result;
+  });
+
+  autoCount = computed(() => this.allTags().filter(t => t.state === 'auto').length);
+  defaultCount = computed(() => this.allTags().filter(t => t.state === 'default').length);
+  filteredCount = computed(() => this.allTags().filter(t => t.state === 'filtered').length);
+
+  avgSelectionRate = computed(() => {
+    const t = this.allTags();
+    if (t.length === 0) return 0;
+    return t.reduce((sum, tag) => sum + tag.score, 0) / t.length;
+  });
+
+  setFilter(tab: FilterTab): void {
+    this.activeFilter.set(tab);
+  }
 
   loadPreferences(): void {
     const id = this.chatId().trim();
@@ -83,6 +121,18 @@ export class TagPreferencesComponent {
         this.error.set('Failed to reset preferences');
         this.loading.set(false);
       },
+    });
+  }
+
+  changeState(tag: TagRow, newState: string): void {
+    const id = this.chatId().trim();
+    if (!id) return;
+
+    const override: TagOverride | null = newState === 'default' ? null : newState as TagOverride;
+
+    this.service.setTagOverride(id, tag.name, override).subscribe({
+      next: () => this.loadPreferences(),
+      error: () => this.error.set(`Failed to update "${tag.name}"`),
     });
   }
 
