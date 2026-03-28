@@ -1,8 +1,7 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { InboxService, Article } from '../../services/inbox.service';
-import { TagPreferenceService } from '../../services/tag-preference.service';
-import { AuthService } from '../../services/auth.service';
+import { SavedService } from '../../services/saved.service';
+import { Article } from '../../services/inbox.service';
 import { formatDate } from '../../shared/format';
 
 type ImportanceFilter = 'all' | 'high' | 'medium' | 'low';
@@ -16,28 +15,19 @@ interface TagWithCount {
 
 const IMPORTANCE_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
-const IMPORTANCE_TOOLTIP: Record<string, string> = {
-  high: 'High importance: breaking news, major announcements, or critical industry changes that require immediate attention',
-  medium: 'Medium importance: notable developments, significant updates, or interesting analyses worth reading',
-  low: 'Low importance: general news, minor updates, or niche topics with limited broader impact',
-};
-
 const COLLAPSED_TAG_LIMIT = 8;
 
 @Component({
-  selector: 'app-inbox',
+  selector: 'app-saved',
   imports: [FormsModule],
-  templateUrl: './inbox.html',
-  styleUrl: './inbox.scss',
+  templateUrl: './saved.html',
+  styleUrl: './saved.scss',
 })
-export class InboxComponent {
-  private service = inject(InboxService);
-  private prefService = inject(TagPreferenceService);
-  private auth = inject(AuthService);
+export class SavedComponent {
+  private service = inject(SavedService);
 
   loading = signal(false);
   deleting = signal(false);
-  saving = signal(false);
   error = signal<string | null>(null);
   articles = signal<Article[]>([]);
 
@@ -50,15 +40,7 @@ export class InboxComponent {
   expandedId = signal<string | null>(null);
   selectedIds = signal<Set<string>>(new Set());
   deletingIds = signal<Set<string>>(new Set());
-  savingIds = signal<Set<string>>(new Set());
   showAllTags = signal(false);
-
-  // Tag preference states
-  tagStates = signal<Record<string, string>>({});
-
-  // Summary
-  summaryHtml = signal('');
-  summaryLoading = signal(false);
 
   // Stats
   totalCount = computed(() => this.articles().length);
@@ -69,6 +51,29 @@ export class InboxComponent {
   uniqueSources = computed(() =>
     [...new Set(this.articles().map(a => a.feedSource))].sort()
   );
+
+  sourceCounts = computed(() => {
+    const counts: Record<string, number> = {};
+    for (const a of this.articles()) {
+      counts[a.feedSource] = (counts[a.feedSource] || 0) + 1;
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, count }));
+  });
+
+  topSources = computed(() =>
+    this.sourceCounts()
+      .slice(0, 3)
+      .map(s => `${s.name} (${s.count})`)
+      .join(', ')
+  );
+
+  maxSourceCount = computed(() => {
+    const sc = this.sourceCounts();
+    return sc.length > 0 ? sc[0].count : 1;
+  });
 
   tagCounts = computed<TagWithCount[]>(() => {
     const counts: Record<string, number> = {};
@@ -98,18 +103,6 @@ export class InboxComponent {
   maxTagCount = computed(() => {
     const top = this.topTags();
     return top.length > 0 ? top[0].count : 1;
-  });
-
-  topSources = computed(() => {
-    const counts: Record<string, number> = {};
-    for (const a of this.articles()) {
-      counts[a.feedSource] = (counts[a.feedSource] || 0) + 1;
-    }
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([name, count]) => `${name} (${count})`)
-      .join(', ');
   });
 
   filteredArticles = computed(() => {
@@ -159,17 +152,6 @@ export class InboxComponent {
     return visible.every(a => sel.has(a.id));
   });
 
-  tagBadgeClass(tag: string): string {
-    const state = this.tagStates()[tag];
-    if (state === 'auto') return 'badge badge-tag-auto';
-    if (state === 'filtered') return 'badge badge-tag-filtered';
-    return 'badge badge-tag';
-  }
-
-  importanceTooltip(level: string): string {
-    return IMPORTANCE_TOOLTIP[level] || '';
-  }
-
   // Tag filter
   isTagSelected(tag: string): boolean {
     return this.selectedTags().has(tag);
@@ -198,14 +180,6 @@ export class InboxComponent {
     return this.deletingIds().has(id);
   }
 
-  isSaving(id: string): boolean {
-    return this.savingIds().has(id);
-  }
-
-  isBusy(id: string): boolean {
-    return this.deletingIds().has(id) || this.savingIds().has(id);
-  }
-
   // Selection
   isSelected(id: string): boolean {
     return this.selectedIds().has(id);
@@ -231,7 +205,7 @@ export class InboxComponent {
   bulkDelete(): void {
     const ids = [...this.selectedIds()];
     if (ids.length === 0) return;
-    if (!confirm(`Delete ${ids.length} article${ids.length > 1 ? 's' : ''}?`)) return;
+    if (!confirm(`Remove ${ids.length} article${ids.length > 1 ? 's' : ''} from saved?`)) return;
 
     this.deleting.set(true);
     this.error.set(null);
@@ -249,123 +223,33 @@ export class InboxComponent {
         this.deleting.set(false);
       },
       error: () => {
-        this.error.set('Failed to delete articles');
+        this.error.set('Failed to remove articles');
         this.deletingIds.set(new Set());
         this.deleting.set(false);
       },
     });
   }
 
-  saveArticle(article: Article): void {
-    if (this.savingIds().has(article.id)) return;
-
-    this.savingIds.update(set => new Set(set).add(article.id));
-
-    this.service.saveArticles([article.id]).subscribe({
-      next: () => {
-        this.articles.update(list => list.filter(a => a.id !== article.id));
-        this.selectedIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-        this.savingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-        if (this.expandedId() === article.id) this.expandedId.set(null);
-      },
-      error: () => {
-        this.savingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-        this.error.set(`Failed to save "${article.title}"`);
-      },
-    });
-  }
-
-  bulkSave(): void {
-    const ids = [...this.selectedIds()];
-    if (ids.length === 0) return;
-
-    this.saving.set(true);
-    this.error.set(null);
-    this.savingIds.set(new Set(ids));
-
-    this.service.saveArticles(ids).subscribe({
-      next: () => {
-        const savedSet = new Set(ids);
-        this.articles.update(list => list.filter(a => !savedSet.has(a.id)));
-        this.selectedIds.set(new Set());
-        this.savingIds.set(new Set());
-        if (this.expandedId() && savedSet.has(this.expandedId()!)) {
-          this.expandedId.set(null);
-        }
-        this.saving.set(false);
-      },
-      error: () => {
-        this.error.set('Failed to save articles');
-        this.savingIds.set(new Set());
-        this.saving.set(false);
-      },
-    });
-  }
-
-  loadInbox(): void {
+  loadSaved(): void {
     this.loading.set(true);
     this.error.set(null);
     this.selectedIds.set(new Set());
-    this.summaryHtml.set('');
 
-    this.service.getInbox().subscribe({
+    this.service.getSaved().subscribe({
       next: (articles) => {
         this.articles.set(articles);
         this.loading.set(false);
-        this.loadTagStates();
       },
       error: (err) => {
-        this.error.set(err.status === 401 ? 'Invalid API token' : 'Failed to load inbox');
+        this.error.set(err.status === 401 ? 'Invalid API token' : 'Failed to load saved articles');
         this.loading.set(false);
-      },
-    });
-  }
-
-  private loadTagStates(): void {
-    const chatId = this.auth.chatId();
-    if (!chatId) return;
-
-    this.prefService.getPreferences(chatId).subscribe({
-      next: (prefs) => {
-        const threshold = prefs.threshold;
-        const minRuns = prefs.minRuns;
-        const overrides = prefs.tagOverrides ?? {};
-        const states: Record<string, string> = {};
-
-        for (const [tag, stats] of Object.entries(prefs.tags)) {
-          const override = overrides[tag];
-          if (override === 'filtered') {
-            states[tag] = 'filtered';
-          } else if (override === 'auto' || prefs.scores[tag]?.autoSelected) {
-            states[tag] = 'auto';
-          }
-        }
-
-        this.tagStates.set(states);
-      },
-      error: () => { /* preferences are optional, ignore errors */ },
-    });
-  }
-
-  generateSummary(): void {
-    this.summaryLoading.set(true);
-    this.error.set(null);
-
-    this.service.generateSummary().subscribe({
-      next: (res) => {
-        this.summaryHtml.set(res.html);
-        this.summaryLoading.set(false);
-      },
-      error: () => {
-        this.error.set('Failed to generate summary');
-        this.summaryLoading.set(false);
       },
     });
   }
 
   deleteArticle(article: Article): void {
     if (this.deletingIds().has(article.id)) return;
-    if (!confirm(`Delete "${article.title}"?`)) return;
+    if (!confirm(`Remove "${article.title}" from saved?`)) return;
 
     this.deletingIds.update(set => new Set(set).add(article.id));
 
@@ -378,7 +262,7 @@ export class InboxComponent {
       },
       error: () => {
         this.deletingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-        this.error.set(`Failed to delete "${article.title}"`);
+        this.error.set(`Failed to remove "${article.title}"`);
       },
     });
   }

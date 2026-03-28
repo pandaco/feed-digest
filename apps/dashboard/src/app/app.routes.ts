@@ -12,6 +12,11 @@ export const appRoutes: Route[] = [
       import('./pages/inbox/inbox').then((m) => m.InboxComponent),
   },
   {
+    path: 'saved',
+    loadComponent: () =>
+      import('./pages/saved/saved').then((m) => m.SavedComponent),
+  },
+  {
     path: 'preferences',
     loadComponent: () =>
       import('./pages/tag-preferences/tag-preferences').then(

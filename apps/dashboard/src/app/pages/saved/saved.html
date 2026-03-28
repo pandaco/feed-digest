@@ -1,9 +1,9 @@
 <div class="container">
-  <h1>Inbox</h1>
+  <h1>Saved Articles</h1>
 
   <div class="page-actions">
-    <button class="btn btn-primary" (click)="loadInbox()" [disabled]="loading()">
-      {{ loading() ? 'Loading...' : 'Load Inbox' }}
+    <button class="btn btn-primary" (click)="loadSaved()" [disabled]="loading()">
+      {{ loading() ? 'Loading...' : 'Load Saved' }}
     </button>
   </div>
 
@@ -16,17 +16,17 @@
     <section class="stats-section">
       <div class="stat-card">
         <span class="stat-value">{{ totalCount() }}</span>
-        <span class="stat-label">Articles</span>
+        <span class="stat-label">Saved</span>
       </div>
-      <div class="stat-card" [title]="importanceTooltip('high')">
+      <div class="stat-card">
         <span class="stat-value stat-high">{{ highCount() }}</span>
         <span class="stat-label">High</span>
       </div>
-      <div class="stat-card" [title]="importanceTooltip('medium')">
+      <div class="stat-card">
         <span class="stat-value stat-medium">{{ mediumCount() }}</span>
         <span class="stat-label">Medium</span>
       </div>
-      <div class="stat-card" [title]="importanceTooltip('low')">
+      <div class="stat-card">
         <span class="stat-value stat-low">{{ lowCount() }}</span>
         <span class="stat-label">Low</span>
       </div>
@@ -36,34 +36,50 @@
       </div>
     </section>
 
-    <!-- Top 10 tags histogram -->
-    <section class="chart-section">
-      <div class="chart-header">
-        <h2>Top Tags</h2>
-        <button class="btn btn-primary btn-sm" (click)="generateSummary()" [disabled]="summaryLoading()">
-          {{ summaryLoading() ? 'Generating...' : 'Generate Summary' }}
-        </button>
-      </div>
-      <div class="histogram">
-        @for (tag of topTags(); track tag.name) {
-          <div class="histogram-row">
-            <span class="histogram-label">{{ tag.name }}</span>
-            <div class="histogram-bar-container">
-              <div
-                class="histogram-bar"
-                [style.width.%]="(tag.count / maxTagCount()) * 100"
-              ></div>
+    <!-- Charts row -->
+    <div class="charts-row">
+      <!-- Top Tags -->
+      <section class="chart-section">
+        <div class="chart-header">
+          <h2>Top Tags</h2>
+        </div>
+        <div class="histogram">
+          @for (tag of topTags(); track tag.name) {
+            <div class="histogram-row">
+              <span class="histogram-label">{{ tag.name }}</span>
+              <div class="histogram-bar-container">
+                <div
+                  class="histogram-bar"
+                  [style.width.%]="(tag.count / maxTagCount()) * 100"
+                ></div>
+              </div>
+              <span class="histogram-count">{{ tag.count }}</span>
             </div>
-            <span class="histogram-count">{{ tag.count }}</span>
-          </div>
-        }
-      </div>
-    </section>
+          }
+        </div>
+      </section>
 
-    <!-- AI Summary -->
-    @if (summaryHtml()) {
-      <section class="summary-section" [innerHTML]="summaryHtml()"></section>
-    }
+      <!-- Top Sources -->
+      <section class="chart-section">
+        <div class="chart-header">
+          <h2>Top Sources</h2>
+        </div>
+        <div class="histogram">
+          @for (source of sourceCounts(); track source.name) {
+            <div class="histogram-row">
+              <span class="histogram-label">{{ source.name }}</span>
+              <div class="histogram-bar-container">
+                <div
+                  class="histogram-bar histogram-bar-source"
+                  [style.width.%]="(source.count / maxSourceCount()) * 100"
+                ></div>
+              </div>
+              <span class="histogram-count">{{ source.count }}</span>
+            </div>
+          }
+        </div>
+      </section>
+    </div>
 
     <!-- Tag filter chips -->
     <section class="tag-filter-section">
@@ -94,16 +110,13 @@
           <button class="filter-tab" [class.active]="importanceFilter() === 'all'" (click)="importanceFilter.set('all')">
             All ({{ totalCount() }})
           </button>
-          <button class="filter-tab" [class.active]="importanceFilter() === 'high'" (click)="importanceFilter.set('high')"
-            [title]="importanceTooltip('high')">
+          <button class="filter-tab" [class.active]="importanceFilter() === 'high'" (click)="importanceFilter.set('high')">
             High ({{ highCount() }})
           </button>
-          <button class="filter-tab" [class.active]="importanceFilter() === 'medium'" (click)="importanceFilter.set('medium')"
-            [title]="importanceTooltip('medium')">
+          <button class="filter-tab" [class.active]="importanceFilter() === 'medium'" (click)="importanceFilter.set('medium')">
             Medium ({{ mediumCount() }})
           </button>
-          <button class="filter-tab" [class.active]="importanceFilter() === 'low'" (click)="importanceFilter.set('low')"
-            [title]="importanceTooltip('low')">
+          <button class="filter-tab" [class.active]="importanceFilter() === 'low'" (click)="importanceFilter.set('low')">
             Low ({{ lowCount() }})
           </button>
         </div>
@@ -130,14 +143,9 @@
       @if (selectedCount() > 0) {
         <div class="bulk-bar">
           <span>{{ selectedCount() }} selected</span>
-          <div class="bulk-actions">
-            <button class="btn btn-success btn-sm" (click)="bulkSave()" [disabled]="saving() || deleting()">
-              {{ saving() ? 'Saving...' : 'Save selected' }}
-            </button>
-            <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="deleting() || saving()">
-              {{ deleting() ? 'Deleting...' : 'Delete selected' }}
-            </button>
-          </div>
+          <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="deleting()">
+            {{ deleting() ? 'Removing...' : 'Remove selected' }}
+          </button>
         </div>
       }
 
@@ -170,7 +178,7 @@
           @for (article of filteredArticles(); track article.id) {
             <tr [class]="'row-importance-' + article.importance"
                 [class.row-selected]="isSelected(article.id)"
-                [class.row-deleting]="isBusy(article.id)">
+                [class.row-deleting]="isDeleting(article.id)">
               <td class="col-check">
                 <input
                   type="checkbox"
@@ -186,24 +194,18 @@
               <td class="article-title">
                 <a [href]="article.url" target="_blank" rel="noopener">{{ article.title }}</a>
                 @if (article.contentUnavailable) {
-                  <span class="badge badge-warning" title="Full content could not be fetched — summary is based on excerpt only">!</span>
-                }
-                @if (article.isSaved) {
-                  <span class="badge badge-saved" title="Marked as saved/starred in InoReader">&#9733;</span>
+                  <span class="badge badge-warning" title="Full content could not be fetched">!</span>
                 }
               </td>
               <td class="article-source">{{ article.feedSource }}</td>
               <td class="article-tags">
                 @for (tag of article.tags; track tag) {
-                  <span [class]="tagBadgeClass(tag)">{{ tag }}</span>
+                  <span class="badge badge-tag">{{ tag }}</span>
                 }
               </td>
               <td>{{ formatDate(article.publishedAt) }}</td>
               <td class="col-actions">
-                <button class="btn-icon btn-icon-success" title="Save" (click)="saveArticle(article)" [disabled]="isBusy(article.id)">
-                  {{ isSaving(article.id) ? '...' : '\u2605' }}
-                </button>
-                <button class="btn-icon btn-icon-danger" title="Delete" (click)="deleteArticle(article)" [disabled]="isBusy(article.id)">
+                <button class="btn-icon btn-icon-danger" title="Remove from saved" (click)="deleteArticle(article)" [disabled]="isDeleting(article.id)">
                   {{ isDeleting(article.id) ? '...' : '\u2715' }}
                 </button>
               </td>
@@ -240,10 +242,6 @@
                       <div class="meta-item">
                         <span class="meta-label">Content</span>
                         <span class="meta-value">{{ article.contentUnavailable ? 'Unavailable' : 'Available' }}</span>
-                      </div>
-                      <div class="meta-item">
-                        <span class="meta-label">Saved</span>
-                        <span class="meta-value">{{ article.isSaved ? 'Yes' : 'No' }}</span>
                       </div>
                       <div class="meta-item">
                         <span class="meta-label">Article ID</span>

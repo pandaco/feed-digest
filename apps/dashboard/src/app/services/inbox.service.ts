@@ -50,4 +50,12 @@ export class InboxService {
       { headers: apiHeaders() },
     );
   }
+
+  saveArticles(articleIds: string[]): Observable<{ saved: number }> {
+    return this.http.post<{ saved: number }>(
+      `${this.apiBase}/save`,
+      { articleIds },
+      { headers: apiHeaders() },
+    );
+  }
 }

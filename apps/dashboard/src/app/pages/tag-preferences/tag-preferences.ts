@@ -1,7 +1,8 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TagPreferenceService, TagPreferenceResponse, TagOverride } from '../../services/tag-preference.service';
-import { formatDate, formatScore, saveToLocalStorage } from '../../shared/format';
+import { AuthService } from '../../services/auth.service';
+import { formatDate, formatScore } from '../../shared/format';
 
 type TagState = 'auto' | 'filtered' | 'default';
 type FilterTab = 'all' | TagState;
@@ -24,9 +25,8 @@ interface TagRow {
 })
 export class TagPreferencesComponent {
   private service = inject(TagPreferenceService);
+  private auth = inject(AuthService);
 
-  apiToken = signal(localStorage.getItem('apiToken') || '');
-  chatId = signal(localStorage.getItem('chatId') || '');
   loading = signal(false);
   error = signal<string | null>(null);
   data = signal<TagPreferenceResponse | null>(null);
@@ -90,7 +90,7 @@ export class TagPreferencesComponent {
   }
 
   loadPreferences(): void {
-    const id = this.chatId().trim();
+    const id = this.auth.chatId().trim();
     if (!id) return;
 
     this.loading.set(true);
@@ -109,7 +109,7 @@ export class TagPreferencesComponent {
   }
 
   resetPreferences(): void {
-    const id = this.chatId().trim();
+    const id = this.auth.chatId().trim();
     if (!id || !confirm('Reset all tag preferences? This cannot be undone.')) return;
 
     this.loading.set(true);
@@ -126,7 +126,7 @@ export class TagPreferencesComponent {
   }
 
   changeState(tag: TagRow, newState: string): void {
-    const id = this.chatId().trim();
+    const id = this.auth.chatId().trim();
     if (!id) return;
 
     const override: TagOverride | null = newState === 'default' ? null : newState as TagOverride;
@@ -139,14 +139,4 @@ export class TagPreferencesComponent {
 
   formatScore = formatScore;
   formatDate = formatDate;
-
-  saveToken(token: string): void {
-    this.apiToken.set(token);
-    saveToLocalStorage('apiToken', token);
-  }
-
-  saveChatId(id: string): void {
-    this.chatId.set(id);
-    saveToLocalStorage('chatId', id);
-  }
 }

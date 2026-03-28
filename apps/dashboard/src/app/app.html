@@ -1,8 +1,44 @@
 <nav class="navbar">
   <a class="navbar-brand" routerLink="/">Feed Digest</a>
-  <a routerLink="/inbox" routerLinkActive="active">Inbox</a>
-  <a routerLink="/preferences" routerLinkActive="active">Tag Preferences</a>
+  <div class="nav-links">
+    <a routerLink="/inbox" routerLinkActive="active">Inbox</a>
+    <a routerLink="/saved" routerLinkActive="active">Saved</a>
+    <a routerLink="/preferences" routerLinkActive="active">Tag Preferences</a>
+  </div>
+  <div class="nav-settings">
+    <button class="btn-settings" (click)="showSettings = !showSettings" [class.has-token]="auth.apiToken()">
+      {{ auth.apiToken() ? '\u2713 Connected' : '\u2699 Settings' }}
+    </button>
+  </div>
 </nav>
+
+@if (showSettings) {
+  <div class="settings-bar">
+    <div class="settings-fields">
+      <div class="settings-field">
+        <label for="global-token">API Token</label>
+        <input
+          id="global-token"
+          type="password"
+          [ngModel]="auth.apiToken()"
+          (ngModelChange)="auth.setApiToken($event)"
+          placeholder="TELEGRAM_SECRET_TOKEN"
+        />
+      </div>
+      <div class="settings-field">
+        <label for="global-chatid">Chat ID</label>
+        <input
+          id="global-chatid"
+          type="text"
+          [ngModel]="auth.chatId()"
+          (ngModelChange)="auth.setChatId($event)"
+          placeholder="Telegram chat ID"
+        />
+      </div>
+    </div>
+  </div>
+}
+
 <main>
   <router-outlet></router-outlet>
 </main>

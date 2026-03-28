@@ -1,34 +1,11 @@
 <div class="container">
   <h1>Tag Preferences</h1>
 
-  <section class="config-section">
-    <div class="field">
-      <label for="token">API Token</label>
-      <input
-        id="token"
-        type="password"
-        [ngModel]="apiToken()"
-        (ngModelChange)="saveToken($event)"
-        placeholder="TELEGRAM_SECRET_TOKEN"
-      />
-    </div>
-
-    <div class="field-row">
-      <div class="field">
-        <label for="chatId">Chat ID</label>
-        <input
-          id="chatId"
-          type="text"
-          [ngModel]="chatId()"
-          (ngModelChange)="saveChatId($event)"
-          placeholder="Telegram chat ID"
-        />
-      </div>
-      <button class="btn btn-primary" (click)="loadPreferences()" [disabled]="loading()">
-        {{ loading() ? 'Loading...' : 'Load' }}
-      </button>
-    </div>
-  </section>
+  <div class="page-actions">
+    <button class="btn btn-primary" (click)="loadPreferences()" [disabled]="loading()">
+      {{ loading() ? 'Loading...' : 'Load Preferences' }}
+    </button>
+  </div>
 
   @if (error()) {
     <div class="alert alert-error">{{ error() }}</div>
