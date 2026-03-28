@@ -63,6 +63,11 @@ async function startPolling() {
     next();
   });
 
+  app.use('/api', (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
+
   app.use('/api', (req, res, next) => {
     const headerToken = req.headers['x-telegram-bot-api-secret-token'];
     if (secretToken && headerToken !== secretToken) {
@@ -155,6 +160,64 @@ async function startPolling() {
     } catch (error) {
       console.error('[API] Failed to bulk delete:', error);
       res.status(500).json({ error: 'Failed to bulk delete' });
+    }
+  });
+
+  app.post('/api/inbox/save', express.json(), async (req, res) => {
+    const { articleIds } = req.body;
+    if (!Array.isArray(articleIds) || articleIds.length === 0) {
+      res.status(400).json({ error: 'articleIds must be a non-empty array' });
+      return;
+    }
+    try {
+      const allArticles = await storage.getFromInbox();
+      const toSave = allArticles.filter(a => articleIds.includes(a.id));
+      if (toSave.length === 0) {
+        res.status(404).json({ error: 'No matching articles found in inbox' });
+        return;
+      }
+      await storage.appendToSaved(toSave.map(a => ({ ...a, isSaved: true })));
+      await storage.deleteFromInbox(toSave.map(a => a.id));
+      res.json({ saved: toSave.length });
+    } catch (error) {
+      console.error('[API] Failed to save articles:', error);
+      res.status(500).json({ error: 'Failed to save articles' });
+    }
+  });
+
+  // --- Saved API ---
+  app.get('/api/saved', async (_req, res) => {
+    try {
+      const articles = await storage.getFromSaved();
+      res.json(articles);
+    } catch (error) {
+      console.error('[API] Failed to fetch saved:', error);
+      res.status(500).json({ error: 'Failed to fetch saved articles' });
+    }
+  });
+
+  app.delete('/api/saved/:articleId', async (req, res) => {
+    try {
+      await storage.deleteFromSaved([req.params['articleId']]);
+      res.json({ message: 'Article removed from saved' });
+    } catch (error) {
+      console.error('[API] Failed to delete saved article:', error);
+      res.status(500).json({ error: 'Failed to delete saved article' });
+    }
+  });
+
+  app.post('/api/saved/bulk-delete', express.json(), async (req, res) => {
+    const { articleIds } = req.body;
+    if (!Array.isArray(articleIds) || articleIds.length === 0) {
+      res.status(400).json({ error: 'articleIds must be a non-empty array' });
+      return;
+    }
+    try {
+      await storage.deleteFromSaved(articleIds);
+      res.json({ deleted: articleIds.length });
+    } catch (error) {
+      console.error('[API] Failed to bulk delete saved:', error);
+      res.status(500).json({ error: 'Failed to bulk delete saved articles' });
     }
   });
 
