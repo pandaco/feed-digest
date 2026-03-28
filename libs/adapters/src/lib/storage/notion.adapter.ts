@@ -1,4 +1,5 @@
 import { Client } from '@notionhq/client';
+import pLimit from 'p-limit';
 import { Article, StoragePort } from '@feed-digest/core';
 
 export class NotionAdapter implements StoragePort {
@@ -69,7 +70,10 @@ export class NotionAdapter implements StoragePort {
 
     console.log(`[NotionAdapter] Deleting ${articleIds.length} articles from Inbox...`);
 
-    for (const articleId of articleIds) {
+    const limit = pLimit(5);
+    let deleted = 0;
+
+    await Promise.all(articleIds.map(articleId => limit(async () => {
       const results = await this.queryDatabase(this.inboxDbId, {
         property: 'Article ID',
         rich_text: { equals: articleId },
@@ -77,10 +81,8 @@ export class NotionAdapter implements StoragePort {
 
       for (const page of results.results) {
         if (!('id' in page)) continue;
-        
-        // Skip if already archived to avoid "Can't edit block that is archived" error
+
         if ((page as any).archived || (page as any).in_trash) {
-          console.log(`[NotionAdapter] Page ${page.id} is already archived, skipping.`);
           continue;
         }
 
@@ -89,17 +91,18 @@ export class NotionAdapter implements StoragePort {
             page_id: page.id,
             in_trash: true,
           });
+          deleted++;
         } catch (err: any) {
           if (err?.code === 'validation_error' && err?.message?.includes('archived')) {
-            console.log(`[NotionAdapter] Page ${page.id} was archived concurrently, skipping.`);
+            // Already archived concurrently, skip
           } else {
             throw err;
           }
         }
       }
-    }
+    })));
 
-    console.log(`[NotionAdapter] Deleted ${articleIds.length} articles from Inbox.`);
+    console.log(`[NotionAdapter] Deleted ${deleted} articles from Inbox.`);
   }
 
   async getUntaggedArticles(): Promise<Article[]> {

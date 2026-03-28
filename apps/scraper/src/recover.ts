@@ -10,16 +10,9 @@ async function reEnrichUntagged(
   storage: ReturnType<typeof createStorage>,
   llm: ReturnType<typeof createLlm>['llm'],
   languageName: string,
+  untagged: Awaited<ReturnType<ReturnType<typeof createStorage>['getUntaggedArticles']>>,
 ) {
-  console.log('[Recover] Checking for untagged articles in Inbox...');
-  const untagged = await storage.getUntaggedArticles();
-
-  if (untagged.length === 0) {
-    console.log('[Recover] No untagged articles found.');
-    return;
-  }
-
-  console.log(`[Recover] Found ${untagged.length} untagged articles. Re-enriching...`);
+  console.log(`[Recover] Re-enriching ${untagged.length} untagged articles...`);
   for (const article of untagged) {
     try {
       const enrichment = await llm.enrich({
@@ -93,7 +86,17 @@ async function sendRecoveryNotification(
   console.log('[Recover] Recovery successful. Check Telegram.');
 }
 
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return minutes > 0
+    ? `${minutes}m ${remainingSeconds}s`
+    : `${remainingSeconds}s`;
+}
+
 async function main() {
+  const startTime = Date.now();
   const summaryLang = process.env['SUMMARY_LANG'] || 'fr';
   const languageName = LANGUAGE_MAP[summaryLang] || summaryLang;
 
@@ -107,11 +110,22 @@ async function main() {
     chatId: process.env['TELEGRAM_CHAT_ID']!,
   });
 
+  const untagged = await storage.getUntaggedArticles();
+  const inbox = await storage.getFromInbox();
+  console.log(`[Recover] Articles to process: ${untagged.length} untagged, ${inbox.length} in Inbox`);
+
   try {
-    await reEnrichUntagged(storage, llm, languageName);
+    if (untagged.length > 0) {
+      await reEnrichUntagged(storage, llm, languageName, untagged);
+    } else {
+      console.log('[Recover] No untagged articles found.');
+    }
     await sendRecoveryNotification(storage, llm, notifier, session, summaryLang, llmProvider, languageName);
   } catch (error) {
     console.error('[Recover] Recovery failed:', error);
+  } finally {
+    const elapsed = formatDuration(Date.now() - startTime);
+    console.log(`[Recover] Done in ${elapsed}.`);
   }
 }
 
