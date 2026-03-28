@@ -7,7 +7,11 @@ export interface TagStats {
   lastSelectedAt?: string;
 }
 
+export type TagOverride = 'auto' | 'filtered';
+
 export interface TagPreference {
   chatId: string;
   tags: Record<string, TagStats>;
+  tagOverrides?: Record<string, TagOverride>;
+  runCount?: number;
 }
