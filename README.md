@@ -17,8 +17,8 @@ libs/adapters/      Concrete implementations
   tag-preference/   DynamoDbTagPreferenceAdapter, FileTagPreferenceAdapter
 libs/pipeline/      Pipeline orchestration
 apps/scraper/       CLI entry point (composition root)
-apps/webhook/       AWS Lambda handler for Telegram callbacks + Preferences API
-apps/dashboard/     Angular web UI for tag preference management
+apps/webhook/       AWS Lambda handler for Telegram callbacks + REST API
+apps/dashboard/     Angular web UI: inbox browser, tag preference management
 ```
 
 ## Local setup

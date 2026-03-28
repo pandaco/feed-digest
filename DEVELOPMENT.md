@@ -177,6 +177,19 @@ npx nx serve dashboard
 The app will be available at `http://localhost:4200`.
 
 ### Features
+
+**Inbox**
+- Browse all articles in inbox with title, source, tags, importance, and publication date
+- Expand any article to view its full summary and metadata
+- Filter by importance level, source, tags (multi-select), and free-text search (title + summary)
+- Sort by published date, run date, or importance
+- Bulk selection (per-article or select-all visible) with bulk delete
+- Stats overview: article counts by importance, top sources
+- Top 10 tags histogram
+- AI-generated HTML summary of the entire inbox (via LLM)
+- Tags colored by preference state (auto = green, filtered = red, default = purple)
+
+**Tag Preferences**
 - View all tracked tags with their selection scores (progress bars)
 - Filter tags by state: All, Auto, Default, Filtered
 - Search tags by name
@@ -192,6 +205,10 @@ The dashboard connects to the webhook Lambda's REST API:
 | `GET` | `/api/preferences/:chatId` | Get preferences with computed scores, overrides, and run count |
 | `POST` | `/api/preferences/:chatId/tags/:tag/override` | Set a tag override (`{ "override": "auto" \| "filtered" \| null }`) |
 | `DELETE` | `/api/preferences/:chatId` | Reset all preferences |
+| `GET` | `/api/inbox` | List all articles in inbox |
+| `DELETE` | `/api/inbox/:articleId` | Delete a single article from inbox |
+| `POST` | `/api/inbox/bulk-delete` | Delete multiple articles (`{ "articleIds": [...] }`) |
+| `POST` | `/api/inbox/summary` | Generate an AI summary of all inbox articles (HTML) |
 
 All API calls require the `x-telegram-bot-api-secret-token` header.
 
@@ -244,5 +261,5 @@ Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployme
   - `tag-preference/dynamodb-tag-preference.adapter.ts` / `tag-preference/file-tag-preference.adapter.ts` — Tag preference learning
 - **libs/pipeline**: Orchestration (the "Glue") between the ports.
 - **apps/scraper**: CLI entry point (composition root).
-- **apps/webhook**: AWS Lambda handler for Telegram callbacks + Preferences REST API.
-- **apps/dashboard**: Angular web UI for tag preference management.
+- **apps/webhook**: AWS Lambda handler for Telegram callbacks + REST API (preferences + inbox).
+- **apps/dashboard**: Angular web UI: inbox browser with filtering/bulk actions, tag preference management.
