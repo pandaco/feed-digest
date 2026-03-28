@@ -49,4 +49,14 @@ export interface LlmPort {
    * @returns A global summary of the run.
    */
   summarizeRun(articles: Article[], language: string): Promise<string>;
+
+  /**
+   * Generates a detailed HTML summary of inbox articles.
+   * Highlights key themes, notable articles, and trends.
+   *
+   * @param articles List of inbox articles.
+   * @param language Target language for the summary.
+   * @returns An HTML-formatted summary.
+   */
+  summarizeInbox(articles: Article[], language: string): Promise<string>;
 }

@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Article, LlmPort, EnrichInput, EnrichOutput } from '@feed-digest/core';
+import { cleanHtml } from './clean-html';
 
 export class ClaudeAdapter implements LlmPort {
   private client: Anthropic;
@@ -69,6 +70,44 @@ export class ClaudeAdapter implements LlmPort {
     } catch (error) {
       console.error('[ClaudeAdapter] Failed to summarize run:', error);
       return `Global run summary (automated summary failed).`;
+    }
+  }
+
+  async summarizeInbox(articles: Article[], language: string): Promise<string> {
+    if (articles.length === 0) return '<p>No articles in inbox.</p>';
+
+    const items = articles.map((a) =>
+      `- [${a.feedSource}] "${a.title}" (${a.importance})`
+    ).join('\n');
+
+    const userPrompt = `Summarize these ${articles.length} articles concisely in ${language}. Output RAW HTML only (no markdown, no backticks, no code blocks).
+
+Format:
+<p>1-2 sentence overview.</p>
+<h3>Themes</h3>
+<ul><li><strong>Theme</strong> — one-line explanation</li></ul>
+<h3>Standout</h3>
+<ul><li><strong>Title</strong> — why it matters (one line)</li></ul>
+
+Keep it short: max 5 themes, max 3 standout articles. No preamble, no conclusion.
+
+Articles:
+${items}`;
+
+    try {
+      const response = await this.withRetry(() =>
+        this.client.messages.create({
+          model: this.model,
+          max_tokens: 1024,
+          messages: [{ role: 'user', content: userPrompt }],
+        })
+      );
+
+      const text = response.content[0].type === 'text' ? response.content[0].text : '';
+      return cleanHtml(text);
+    } catch (error) {
+      console.error('[ClaudeAdapter] Failed to summarize inbox:', error);
+      return '<p>Summary generation failed.</p>';
     }
   }
 
