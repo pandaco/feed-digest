@@ -18,7 +18,7 @@ libs/adapters/      Concrete implementations
 libs/pipeline/      Pipeline orchestration
 apps/scraper/       CLI entry point (composition root)
 apps/webhook/       AWS Lambda handler for Telegram callbacks + REST API
-apps/dashboard/     Angular web UI: inbox browser, tag preference management
+apps/dashboard/     Angular web UI: inbox browser, saved articles, tag preferences
 ```
 
 ## Local setup

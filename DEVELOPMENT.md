@@ -183,11 +183,19 @@ The app will be available at `http://localhost:4200`.
 - Expand any article to view its full summary and metadata
 - Filter by importance level, source, tags (multi-select), and free-text search (title + summary)
 - Sort by published date, run date, or importance
-- Bulk selection (per-article or select-all visible) with bulk delete
+- Bulk selection (per-article or select-all visible) with bulk delete and bulk save
+- Save articles individually or in bulk (moves from inbox to saved)
 - Stats overview: article counts by importance, top sources
 - Top 10 tags histogram
 - AI-generated HTML summary of the entire inbox (via LLM)
 - Tags colored by preference state (auto = green, filtered = red, default = purple)
+
+**Saved Articles**
+- Browse all saved/starred articles with the same filtering and sorting as inbox
+- Top 10 tags and top 5 sources histograms
+- Filter by importance, source, tags, and free-text search
+- Bulk selection with bulk remove
+- Expandable detail rows with full summary and metadata
 
 **Tag Preferences**
 - View all tracked tags with their selection scores (progress bars)
@@ -208,7 +216,11 @@ The dashboard connects to the webhook Lambda's REST API:
 | `GET` | `/api/inbox` | List all articles in inbox |
 | `DELETE` | `/api/inbox/:articleId` | Delete a single article from inbox |
 | `POST` | `/api/inbox/bulk-delete` | Delete multiple articles (`{ "articleIds": [...] }`) |
+| `POST` | `/api/inbox/save` | Save articles (move from inbox to saved) (`{ "articleIds": [...] }`) |
 | `POST` | `/api/inbox/summary` | Generate an AI summary of all inbox articles (HTML) |
+| `GET` | `/api/saved` | List all saved articles |
+| `DELETE` | `/api/saved/:articleId` | Remove a single article from saved |
+| `POST` | `/api/saved/bulk-delete` | Remove multiple articles from saved (`{ "articleIds": [...] }`) |
 
 All API calls require the `x-telegram-bot-api-secret-token` header.
 
@@ -261,5 +273,5 @@ Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployme
   - `tag-preference/dynamodb-tag-preference.adapter.ts` / `tag-preference/file-tag-preference.adapter.ts` — Tag preference learning
 - **libs/pipeline**: Orchestration (the "Glue") between the ports.
 - **apps/scraper**: CLI entry point (composition root).
-- **apps/webhook**: AWS Lambda handler for Telegram callbacks + REST API (preferences + inbox).
-- **apps/dashboard**: Angular web UI: inbox browser with filtering/bulk actions, tag preference management.
+- **apps/webhook**: AWS Lambda handler for Telegram callbacks + REST API (preferences, inbox, saved).
+- **apps/dashboard**: Angular web UI: inbox browser, saved articles, tag preference management.
