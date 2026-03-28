@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { apiHeaders } from '../shared/api-headers';
 
 export type TagOverride = 'auto' | 'filtered';
 
@@ -19,25 +20,17 @@ export class TagPreferenceService {
   private http = inject(HttpClient);
   private apiBase = '/api/preferences';
 
-  private getHeaders(): HttpHeaders {
-    const token = localStorage.getItem('apiToken') || '';
-    return new HttpHeaders({
-      'x-telegram-bot-api-secret-token': token,
-      'Content-Type': 'application/json',
-    });
-  }
-
   getPreferences(chatId: string): Observable<TagPreferenceResponse> {
     return this.http.get<TagPreferenceResponse>(
       `${this.apiBase}/${chatId}`,
-      { headers: this.getHeaders() },
+      { headers: apiHeaders() },
     );
   }
 
   resetPreferences(chatId: string): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>(
       `${this.apiBase}/${chatId}`,
-      { headers: this.getHeaders() },
+      { headers: apiHeaders() },
     );
   }
 
@@ -45,7 +38,7 @@ export class TagPreferenceService {
     return this.http.post<{ tag: string; override: TagOverride | null }>(
       `${this.apiBase}/${chatId}/tags/${encodeURIComponent(tag)}/override`,
       { override },
-      { headers: this.getHeaders() },
+      { headers: apiHeaders() },
     );
   }
 }

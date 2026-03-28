@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TagPreferenceService, TagPreferenceResponse, TagOverride } from '../../services/tag-preference.service';
+import { formatDate, formatScore, saveToLocalStorage } from '../../shared/format';
 
 type TagState = 'auto' | 'filtered' | 'default';
 type FilterTab = 'all' | TagState;
@@ -136,28 +137,16 @@ export class TagPreferencesComponent {
     });
   }
 
-  formatScore(score: number): string {
-    return `${Math.round(score * 100)}%`;
-  }
-
-  formatDate(iso?: string): string {
-    if (!iso) return '-';
-    return new Date(iso).toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
+  formatScore = formatScore;
+  formatDate = formatDate;
 
   saveToken(token: string): void {
     this.apiToken.set(token);
-    localStorage.setItem('apiToken', token);
+    saveToLocalStorage('apiToken', token);
   }
 
   saveChatId(id: string): void {
     this.chatId.set(id);
-    localStorage.setItem('chatId', id);
+    saveToLocalStorage('chatId', id);
   }
 }
