@@ -5,7 +5,7 @@ import {
   PutCommand,
   DeleteCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { TagPreference, TagPreferencePort } from '@feed-digest/core';
+import { TagOverride, TagPreference, TagPreferencePort } from '@feed-digest/core';
 
 export class DynamoDbTagPreferenceAdapter implements TagPreferencePort {
   private docClient: DynamoDBDocumentClient;
@@ -33,13 +33,14 @@ export class DynamoDbTagPreferenceAdapter implements TagPreferencePort {
       }
     }
 
+    const runCount = (existing?.runCount ?? 0) + 1;
     await this.docClient.send(
       new PutCommand({
         TableName: this.tableName,
-        Item: { chatId, tags },
+        Item: { chatId, tags, tagOverrides: existing?.tagOverrides, runCount },
       })
     );
-    console.log(`[DynamoDbTagPref] Preferences recorded for chatId: ${chatId}`);
+    console.log(`[DynamoDbTagPref] Preferences recorded for chatId: ${chatId} (run #${runCount})`);
   }
 
   async get(chatId: string): Promise<TagPreference | null> {
@@ -62,5 +63,26 @@ export class DynamoDbTagPreferenceAdapter implements TagPreferencePort {
       })
     );
     console.log(`[DynamoDbTagPref] Preferences reset for chatId: ${chatId}`);
+  }
+
+  async setTagOverride(chatId: string, tag: string, override: TagOverride | null): Promise<void> {
+    const existing = await this.get(chatId);
+    if (!existing) return;
+
+    const overrides = existing.tagOverrides ?? {};
+    if (override === null) {
+      delete overrides[tag];
+    } else {
+      overrides[tag] = override;
+    }
+
+    existing.tagOverrides = overrides;
+    await this.docClient.send(
+      new PutCommand({
+        TableName: this.tableName,
+        Item: existing,
+      })
+    );
+    console.log(`[DynamoDbTagPref] Tag "${tag}" override set to ${override ?? 'default'} for chatId: ${chatId}`);
   }
 }

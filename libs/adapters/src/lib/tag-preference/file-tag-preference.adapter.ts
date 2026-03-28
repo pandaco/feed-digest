@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { TagPreference, TagPreferencePort } from '@feed-digest/core';
+import { TagOverride, TagPreference, TagPreferencePort } from '@feed-digest/core';
 
 export class FileTagPreferenceAdapter implements TagPreferencePort {
   private readonly filePath: string;
@@ -39,9 +39,10 @@ export class FileTagPreferenceAdapter implements TagPreferencePort {
       }
     }
 
-    store[chatId] = { chatId, tags };
+    const runCount = (existing?.runCount ?? 0) + 1;
+    store[chatId] = { chatId, tags, tagOverrides: existing?.tagOverrides, runCount };
     this.writeStore(store);
-    console.log(`[FileTagPref] Preferences recorded locally for chatId: ${chatId}`);
+    console.log(`[FileTagPref] Preferences recorded locally for chatId: ${chatId} (run #${runCount})`);
   }
 
   async get(chatId: string): Promise<TagPreference | null> {
@@ -54,5 +55,22 @@ export class FileTagPreferenceAdapter implements TagPreferencePort {
     delete store[chatId];
     this.writeStore(store);
     console.log(`[FileTagPref] Preferences reset locally for chatId: ${chatId}`);
+  }
+
+  async setTagOverride(chatId: string, tag: string, override: TagOverride | null): Promise<void> {
+    const store = this.readStore();
+    const existing = store[chatId];
+    if (!existing) return;
+
+    const overrides = existing.tagOverrides ?? {};
+    if (override === null) {
+      delete overrides[tag];
+    } else {
+      overrides[tag] = override;
+    }
+
+    existing.tagOverrides = overrides;
+    this.writeStore(store);
+    console.log(`[FileTagPref] Tag "${tag}" override set to ${override ?? 'default'} for chatId: ${chatId}`);
   }
 }
