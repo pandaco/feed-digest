@@ -49,9 +49,23 @@ export interface StoragePort {
   appendToSaved(articles: Article[]): Promise<void>;
 
   /**
+   * Retrieves all articles currently present in the Saved tab.
+   *
+   * @returns List of saved articles.
+   */
+  getFromSaved(): Promise<Article[]>;
+
+  /**
+   * Removes specific articles from the Saved tab.
+   *
+   * @param articleIds List of article IDs to remove.
+   */
+  deleteFromSaved(articleIds: string[]): Promise<void>;
+
+  /**
    * Updates an existing article in the storage (Inbox and All tabs).
    * Matches by article ID.
-   * 
+   *
    * @param article The updated article data.
    */
   updateArticle(article: Article): Promise<void>;

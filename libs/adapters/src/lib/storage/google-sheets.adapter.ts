@@ -89,6 +89,48 @@ export class GoogleSheetsAdapter implements StoragePort {
     await this.appendArticles('Saved', articles);
   }
 
+  async getFromSaved(): Promise<Article[]> {
+    const response = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: 'Saved!A:L',
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length <= 1) return [];
+
+    return rows.slice(1).map(row => ({ ...this.mapRowToArticle(row), isSaved: true }));
+  }
+
+  async deleteFromSaved(articleIds: string[]): Promise<void> {
+    if (articleIds.length === 0) return;
+
+    const response = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: 'Saved!A:L',
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length <= 1) return;
+
+    const headers = rows[0];
+    const dataRows = rows.slice(1);
+    const filteredRows = dataRows.filter((row) => !articleIds.includes(row[0]));
+
+    console.log(`[GoogleSheetsAdapter] Filtering Saved: ${dataRows.length} rows -> ${filteredRows.length} rows.`);
+
+    await this.sheets.spreadsheets.values.clear({
+      spreadsheetId: this.spreadsheetId,
+      range: 'Saved!A:L',
+    });
+
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: 'Saved!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [headers, ...filteredRows] },
+    });
+  }
+
   private async appendArticles(tab: string, articles: Article[]): Promise<void> {
     if (articles.length === 0) {
       console.log(`[GoogleSheetsAdapter] No articles to append to ${tab}.`);

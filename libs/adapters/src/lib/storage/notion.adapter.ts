@@ -65,6 +65,63 @@ export class NotionAdapter implements StoragePort {
     await this.appendArticles(this.savedDbId, articles);
   }
 
+  async getFromSaved(): Promise<Article[]> {
+    const articles: Article[] = [];
+    let cursor: string | undefined;
+
+    do {
+      const response = await this.queryDatabase(
+        this.savedDbId,
+        undefined,
+        [{ property: 'Run At', direction: 'descending' }],
+        cursor
+      );
+
+      for (const page of response.results) {
+        if (!('properties' in page)) continue;
+        articles.push({ ...this.mapPageToArticle(page.properties), isSaved: true });
+      }
+
+      cursor = response.has_more ? response.next_cursor ?? undefined : undefined;
+    } while (cursor);
+
+    return articles;
+  }
+
+  async deleteFromSaved(articleIds: string[]): Promise<void> {
+    if (articleIds.length === 0) return;
+
+    console.log(`[NotionAdapter] Deleting ${articleIds.length} articles from Saved...`);
+
+    const limit = pLimit(5);
+    let deleted = 0;
+
+    await Promise.all(articleIds.map(articleId => limit(async () => {
+      const results = await this.queryDatabase(this.savedDbId, {
+        property: 'Article ID',
+        rich_text: { equals: articleId },
+      });
+
+      for (const page of results.results) {
+        if (!('id' in page)) continue;
+        if ((page as any).archived || (page as any).in_trash) continue;
+
+        try {
+          await this.client.pages.update({ page_id: page.id, in_trash: true });
+          deleted++;
+        } catch (err: any) {
+          if (err?.code === 'validation_error' && err?.message?.includes('archived')) {
+            // Already archived concurrently
+          } else {
+            throw err;
+          }
+        }
+      }
+    })));
+
+    console.log(`[NotionAdapter] Deleted ${deleted} articles from Saved.`);
+  }
+
   async deleteFromInbox(articleIds: string[]): Promise<void> {
     if (articleIds.length === 0) return;
 
