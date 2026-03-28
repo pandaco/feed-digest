@@ -73,9 +73,9 @@ npm run webhook
    - Run summary (stats, duration)
    - Statistics by RSS source
    - AI synthesis of trends
-   - Interactive tag selection (inline buttons, with learned favorites pre-checked)
+   - Interactive tag selection (inline buttons, with learned favorites pre-checked; filtered tags are hidden)
    - List of saved articles (if applicable)
 5. **Filtering**: user selects tags to keep via Telegram
-6. **Preference learning**: tag selections are recorded to auto-select favorites in future runs
+6. **Preference learning**: tag selections are recorded to auto-select favorites in future runs. Tags can also be manually overridden to `auto` (always pre-selected) or `filtered` (hidden from notifications) via the dashboard.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for the full development guide.

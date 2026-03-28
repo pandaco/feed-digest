@@ -147,11 +147,19 @@ Set `NOTION_INBOX_DB_ID`, `NOTION_ALL_DB_ID`, and `NOTION_SAVED_DB_ID` in `.env`
 The system learns from your tag selections to auto-check your favorite tags in future runs.
 
 **How it works:**
-- Each time you validate a tag selection, the system records which tags were selected and which were not.
+- Each time you validate a tag selection, the system records which tags were selected and which were not. A run counter is incremented on each validation.
 - A score is computed for each tag: `selectionCount / presentedCount`.
 - When the score exceeds the threshold (`TAG_PREFERENCE_THRESHOLD`, default `0.6`) and the tag has been presented enough times (`TAG_PREFERENCE_MIN_RUNS`, default `3`), the tag is automatically pre-checked in the Telegram keyboard.
 - Pre-checked tags appear first in the list, sorted by frequency.
 - You can always toggle tags manually before validating.
+
+**Tag overrides:**
+Each tag can have a manual override that takes precedence over the score-based logic:
+- **`auto`**: the tag is always pre-selected, regardless of its score.
+- **`filtered`**: the tag is completely hidden from the Telegram notification keyboard.
+- **`default`** (no override): standard threshold-based behavior.
+
+Overrides are managed via the dashboard or the REST API.
 
 **Local development:** preferences are stored in `tag-preferences.json` at the project root.
 **Production:** preferences are stored in a dedicated DynamoDB table (`DYNAMODB_TAG_PREF_TABLE_NAME`).
@@ -170,7 +178,10 @@ The app will be available at `http://localhost:4200`.
 
 ### Features
 - View all tracked tags with their selection scores (progress bars)
-- See which tags are auto-selected based on the current threshold
+- Filter tags by state: All, Auto, Default, Filtered
+- Search tags by name
+- Change tag state (auto / default / filtered) directly from the table
+- See stats: run count, tag counts by state, average selection rate, threshold
 - Reset all preferences for a chat ID
 
 ### API Endpoints
@@ -178,7 +189,8 @@ The dashboard connects to the webhook Lambda's REST API:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/preferences/:chatId` | Get preferences with computed scores |
+| `GET` | `/api/preferences/:chatId` | Get preferences with computed scores, overrides, and run count |
+| `POST` | `/api/preferences/:chatId/tags/:tag/override` | Set a tag override (`{ "override": "auto" \| "filtered" \| null }`) |
 | `DELETE` | `/api/preferences/:chatId` | Reset all preferences |
 
 All API calls require the `x-telegram-bot-api-secret-token` header.
