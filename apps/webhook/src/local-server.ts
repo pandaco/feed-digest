@@ -1,7 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import express from 'express';
 import * as dotenv from 'dotenv';
-import { FileSessionAdapter, TelegramAdapter, createStorage, createTagPreference } from '@feed-digest/adapters';
+import { FileSessionAdapter, TelegramAdapter, createStorage, createTagPreference, createLlm } from '@feed-digest/adapters';
 import { handleCallback } from '@feed-digest/pipeline';
 
 dotenv.config();
@@ -22,6 +22,7 @@ async function startPolling() {
   const storage = createStorage('Polling');
   const tagPreference = createTagPreference();
   const notifier = new TelegramAdapter({ token, chatId });
+  const { llm } = createLlm('API');
   const summaryLang = process.env['SUMMARY_LANG'] || 'fr';
 
   bot.on('callback_query', async (callbackQuery) => {
@@ -62,7 +63,7 @@ async function startPolling() {
     next();
   });
 
-  app.use('/api/preferences', (req, res, next) => {
+  app.use('/api', (req, res, next) => {
     const headerToken = req.headers['x-telegram-bot-api-secret-token'];
     if (secretToken && headerToken !== secretToken) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -110,8 +111,55 @@ async function startPolling() {
     res.json({ message: 'Preferences reset' });
   });
 
+  // --- Inbox API ---
+  app.get('/api/inbox', async (_req, res) => {
+    try {
+      const articles = await storage.getFromInbox();
+      res.json(articles);
+    } catch (error) {
+      console.error('[API] Failed to fetch inbox:', error);
+      res.status(500).json({ error: 'Failed to fetch inbox' });
+    }
+  });
+
+  app.delete('/api/inbox/:articleId', async (req, res) => {
+    try {
+      await storage.deleteFromInbox([req.params['articleId']]);
+      res.json({ message: 'Article deleted' });
+    } catch (error) {
+      console.error('[API] Failed to delete article:', error);
+      res.status(500).json({ error: 'Failed to delete article' });
+    }
+  });
+
+  app.post('/api/inbox/summary', async (_req, res) => {
+    try {
+      const articles = await storage.getFromInbox();
+      const html = await llm.summarizeInbox(articles, summaryLang);
+      res.json({ html });
+    } catch (error) {
+      console.error('[API] Failed to generate inbox summary:', error);
+      res.status(500).json({ error: 'Failed to generate summary' });
+    }
+  });
+
+  app.post('/api/inbox/bulk-delete', express.json(), async (req, res) => {
+    const { articleIds } = req.body;
+    if (!Array.isArray(articleIds) || articleIds.length === 0) {
+      res.status(400).json({ error: 'articleIds must be a non-empty array' });
+      return;
+    }
+    try {
+      await storage.deleteFromInbox(articleIds);
+      res.json({ deleted: articleIds.length });
+    } catch (error) {
+      console.error('[API] Failed to bulk delete:', error);
+      res.status(500).json({ error: 'Failed to bulk delete' });
+    }
+  });
+
   app.listen(port, () => {
-    console.log(`[API] Preferences API running on http://localhost:${port}/api/preferences/:chatId`);
+    console.log(`[API] Dashboard API running on http://localhost:${port}`);
   });
 }
 
