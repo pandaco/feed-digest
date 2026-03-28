@@ -50,14 +50,17 @@ export async function handleCallback(options: HandleCallbackOptions): Promise<vo
   // --- 2. Handle Final Validation ---
   if (data === 'validate') {
     console.log(`[Pipeline] Validating selection for chatId: ${chatId}`);
-    
+
+    // Delete session immediately to prevent duplicate processing from concurrent clicks
+    await session.delete(chatId);
+
     const allArticleIds = new Set(Object.values(currentSession.tags).flatMap(t => t.articleIds));
     const articlesToDelete = new Set<string>();
 
     for (const articleId of allArticleIds) {
       const articleTags = Object.entries(currentSession.tags)
         .filter(([, state]) => state.articleIds.includes(articleId));
-      
+
       // INVERTED LOGIC: Keep an article only if AT LEAST ONE of its tags is CHECKED.
       // If NONE of the tags associated with the article are checked, delete it.
       const isAnyTagChecked = articleTags.some(([, state]) => state.selected);
@@ -83,8 +86,6 @@ export async function handleCallback(options: HandleCallbackOptions): Promise<vo
       console.log(`[Pipeline] Tag preferences recorded for chatId: ${chatId}`);
     }
 
-    // Cleanup session and notify
-    await session.delete(chatId);
     await notifier.sendConfirmation(totalKept, articlesToDelete.size, summaryLang);
     return;
   }

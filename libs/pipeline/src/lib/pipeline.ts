@@ -39,16 +39,16 @@ async function enrichAndSave(
   minDelayMs: number,
   maxDelayMs: number,
 ): Promise<Article | undefined> {
-  const baseStagger = index * minDelayMs;
-  const jitter = Math.floor(Math.random() * (maxDelayMs + 1));
-  const totalWait = baseStagger + jitter;
+  const tag = `[${index + 1}/${total}]`;
+  const jitter = Math.floor(Math.random() * (maxDelayMs - minDelayMs + 1)) + minDelayMs;
 
-  await new Promise(resolve => setTimeout(resolve, totalWait));
-  console.log(`[Pipeline] [${index + 1}/${total}] Processing: ${meta.title} (wait: ${totalWait}ms)`);
+  await new Promise(resolve => setTimeout(resolve, jitter));
+  console.log(`[Pipeline] ${tag} Fetching content: ${meta.title} (delay: ${jitter}ms)`);
 
   const fullContent = await options.scraper.fetchContent(meta.url);
   const contentUnavailable = !fullContent;
 
+  console.log(`[Pipeline] ${tag} Enriching via ${options.llmProvider}...`);
   const enrichment = await options.llm.enrich({
     title: meta.title,
     content: fullContent || meta.excerpt,
@@ -70,9 +70,10 @@ async function enrichAndSave(
   await options.storage.appendToAll([article]);
   if (article.isSaved) {
     await options.storage.appendToSaved([article]);
-    console.log(`[Pipeline] Article saved/starred -> Saved tab (skipping Inbox): ${article.title}`);
+    console.log(`[Pipeline] ${tag} Saved/starred -> Saved tab (skipping Inbox): ${article.title}`);
   } else {
     await options.storage.appendToInbox([article]);
+    console.log(`[Pipeline] ${tag} Stored in Inbox: ${article.title}`);
   }
 
   return article;
@@ -108,14 +109,30 @@ export async function buildNotificationData(options: BuildNotificationDataOption
     }
   }
 
-  // Compute pre-selection from learned preferences
+  // Compute pre-selection and filtering from learned preferences
   const threshold = parseFloat(process.env['TAG_PREFERENCE_THRESHOLD'] || '0.6');
   const minRuns = parseInt(process.env['TAG_PREFERENCE_MIN_RUNS'] || '3', 10);
+  const filteredTags = new Set<string>();
 
   if (tagPreference && chatId) {
     const prefs = await tagPreference.get(chatId);
     if (prefs) {
+      const overrides = prefs.tagOverrides ?? {};
       for (const tag of Object.keys(sessionTags)) {
+        const override = overrides[tag];
+
+        if (override === 'filtered') {
+          filteredTags.add(tag);
+          continue;
+        }
+
+        if (override === 'auto') {
+          preSelected[tag] = true;
+          sessionTags[tag].selected = true;
+          continue;
+        }
+
+        // Default: threshold-based auto-selection
         const stats = prefs.tags[tag];
         if (stats && stats.presentedCount >= minRuns) {
           const score = stats.selectionCount / stats.presentedCount;
@@ -128,8 +145,16 @@ export async function buildNotificationData(options: BuildNotificationDataOption
     }
   }
 
+  // Build visible tag counts (excluding filtered tags)
+  const visibleTagCounts: Record<string, number> = {};
+  for (const [tag, count] of Object.entries(tagCounts)) {
+    if (!filteredTags.has(tag)) {
+      visibleTagCounts[tag] = count;
+    }
+  }
+
   // Sort: pre-selected first, then by frequency
-  const tagOrder = Object.entries(tagCounts)
+  const tagOrder = Object.entries(visibleTagCounts)
     .sort((a, b) => {
       const aSelected = preSelected[a[0]] ? 1 : 0;
       const bSelected = preSelected[b[0]] ? 1 : 0;
@@ -140,7 +165,7 @@ export async function buildNotificationData(options: BuildNotificationDataOption
 
   const preSelectedCount = Object.keys(preSelected).length;
 
-  return { tagCounts, sourceCounts, sessionTags, articleCache, savedArticles, tagOrder, preSelected, preSelectedCount };
+  return { tagCounts: visibleTagCounts, sourceCounts, sessionTags, articleCache, savedArticles, tagOrder, preSelected, preSelectedCount, filteredTags };
 }
 
 async function sendNotifications(
@@ -231,14 +256,18 @@ export async function runPipeline(options: RunPipelineOptions): Promise<void> {
     const limitMarkRead = pLimit(1);
 
     const results = await Promise.all(metadata.map((meta, i) => limitEnrich(async () => {
+      const tag = `[${i + 1}/${metadata.length}]`;
       try {
         const article = await enrichAndSave(meta, i, metadata.length, options, languageName, runAt, minDelayMs, maxDelayMs);
         if (article) {
-          await limitMarkRead(() => options.scraper.markAsRead(article.id, article.url));
+          await limitMarkRead(async () => {
+            console.log(`[Pipeline] ${tag} Marking as read...`);
+            await options.scraper.markAsRead(article.id, article.url);
+          });
         }
         return article;
       } catch (error) {
-        console.error(`[Pipeline] Failed to process article "${meta.title}":`, error);
+        console.error(`[Pipeline] ${tag} Failed to process "${meta.title}":`, error);
         return undefined;
       }
     })));
