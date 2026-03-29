@@ -1,0 +1,119 @@
+<div class="container">
+  <div class="triage-header">
+    <h1>Triage</h1>
+    <div class="triage-actions">
+      <button class="btn btn-primary" (click)="loadInbox()" [disabled]="loading()">
+        {{ loading() ? 'Loading...' : 'Load Inbox' }}
+      </button>
+      <button class="btn btn-outline" (click)="showHelp.set(true)" title="Keyboard shortcuts">
+        ?
+      </button>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="alert alert-error">{{ error() }}</div>
+  }
+
+  @if (showHelp()) {
+    <div class="help-overlay" (click)="showHelp.set(false)">
+      <div class="help-modal" (click)="$event.stopPropagation()">
+        <h2>Keyboard Shortcuts</h2>
+        <div class="help-grid">
+          <kbd>s</kbd> <span>Save article</span>
+          <kbd>d</kbd> <span>Skip / Delete</span>
+          <kbd>&rarr;</kbd> or <kbd>j</kbd> <span>Next (no action)</span>
+          <kbd>&larr;</kbd> or <kbd>k</kbd> <span>Previous</span>
+          <kbd>?</kbd> <span>Toggle this help</span>
+        </div>
+        <button class="btn btn-outline help-close" (click)="showHelp.set(false)">Close</button>
+      </div>
+    </div>
+  }
+
+  @if (articles().length > 0) {
+    <div class="progress-section">
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="progressPercent()"></div>
+      </div>
+      <span class="progress-text">{{ progress() }} &mdash; {{ progressStats() }}</span>
+    </div>
+  }
+
+  @if (currentArticle(); as article) {
+    <div class="triage-card" [class]="'card-importance-' + article.importance">
+      <div class="card-header">
+        <a class="card-title" [href]="article.url" target="_blank" rel="noopener">{{ article.title }}</a>
+        <span class="card-source">{{ article.feedSource }}</span>
+      </div>
+      <div class="card-meta">
+        <span>Published: {{ formatDate(article.publishedAt) }}</span>
+        <span>Scraper: {{ article.scraperSource || '-' }}</span>
+        <span class="badge badge-{{ article.importance }}">{{ article.importance }}</span>
+      </div>
+      <div class="card-tags">
+        @for (tag of article.tags; track tag) {
+          <span [class]="tagBadgeClass(tag)">{{ tag }}</span>
+        }
+      </div>
+      <div class="card-summary">
+        <p>{{ article.summary }}</p>
+      </div>
+      <div class="card-actions">
+        <button
+          class="action-btn action-save"
+          (click)="saveCurrentArticle()"
+          [disabled]="saving() || skipping()"
+        >
+          {{ saving() ? 'Saving...' : 'Save' }}
+        </button>
+        <button
+          class="action-btn action-pass"
+          (click)="passArticle()"
+          [disabled]="saving() || skipping()"
+        >
+          Pass
+        </button>
+        <button
+          class="action-btn action-skip"
+          (click)="skipCurrentArticle()"
+          [disabled]="saving() || skipping()"
+        >
+          {{ skipping() ? 'Skipping...' : 'Skip' }}
+        </button>
+      </div>
+      <div class="card-nav">
+        <button
+          class="btn btn-outline btn-sm"
+          (click)="goToPrevious()"
+          [disabled]="!canGoPrevious()"
+        >
+          &larr; Previous
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (done()) {
+    <div class="done-card">
+      <div class="done-check">&#10003;</div>
+      <h2>All done!</h2>
+      <p>You've processed all {{ articles().length }} articles.</p>
+      <div class="done-stats">
+        <div class="done-stat">
+          <span class="done-stat-value done-stat-saved">{{ savedCount() }}</span>
+          <span class="done-stat-label">Saved</span>
+        </div>
+        <div class="done-stat">
+          <span class="done-stat-value done-stat-skipped">{{ skippedCount() }}</span>
+          <span class="done-stat-label">Skipped</span>
+        </div>
+        <div class="done-stat">
+          <span class="done-stat-value done-stat-passed">{{ articles().length - savedCount() - skippedCount() }}</span>
+          <span class="done-stat-label">Passed</span>
+        </div>
+      </div>
+      <button class="btn btn-primary" (click)="loadInbox()">Load Again</button>
+    </div>
+  }
+</div>

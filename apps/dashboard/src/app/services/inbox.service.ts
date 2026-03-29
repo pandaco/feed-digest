@@ -17,6 +17,7 @@ export interface Article {
   llmProvider: string;
   summaryLanguage: string;
   isSaved: boolean;
+  scraperSource: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -35,10 +36,10 @@ export class InboxService {
     );
   }
 
-  generateSummary(): Observable<{ html: string }> {
+  generateSummary(period?: string): Observable<{ html: string }> {
     return this.http.post<{ html: string }>(
       `${this.apiBase}/summary`,
-      {},
+      period ? { period } : {},
       { headers: apiHeaders() },
     );
   }

@@ -17,6 +17,11 @@ export const appRoutes: Route[] = [
       import('./pages/saved/saved').then((m) => m.SavedComponent),
   },
   {
+    path: 'triage',
+    loadComponent: () =>
+      import('./pages/triage/triage').then((m) => m.TriageComponent),
+  },
+  {
     path: 'preferences',
     loadComponent: () =>
       import('./pages/tag-preferences/tag-preferences').then(
