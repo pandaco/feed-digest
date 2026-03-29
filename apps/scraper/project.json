@@ -83,6 +83,12 @@
         }
       }
     },
+    "fix-dates": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx tsx --tsconfig tsconfig.base.json apps/scraper/src/fix-dates.ts"
+      }
+    },
     "test": {
       "executor": "@nx/vite:test",
       "outputs": ["{workspaceRoot}/coverage/apps/scraper"],
