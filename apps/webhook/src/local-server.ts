@@ -137,9 +137,28 @@ async function startPolling() {
     }
   });
 
-  app.post('/api/inbox/summary', async (_req, res) => {
+  app.post('/api/inbox/summary', express.json(), async (req, res) => {
     try {
-      const articles = await storage.getFromInbox();
+      let articles = await storage.getFromInbox();
+
+      const period = req.body?.period as string | undefined;
+      if (period) {
+        const now = new Date();
+        let since: Date;
+        if (period === 'today') {
+          since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        } else if (period === 'week') {
+          since = new Date(now);
+          since.setDate(since.getDate() - 7);
+        } else if (period === 'month') {
+          since = new Date(now);
+          since.setMonth(since.getMonth() - 1);
+        } else {
+          since = new Date(0);
+        }
+        articles = articles.filter(a => new Date(a.publishedAt) >= since);
+      }
+
       const html = await llm.summarizeInbox(articles, summaryLang);
       res.json({ html });
     } catch (error) {
