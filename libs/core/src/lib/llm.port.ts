@@ -23,8 +23,6 @@ export interface EnrichOutput {
   summary: string;
   /** Free tags reflecting the main topics in the target language */
   tags: string[];
-  /** Calculated importance level */
-  importance: 'high' | 'medium' | 'low';
 }
 
 /**

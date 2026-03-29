@@ -28,4 +28,6 @@ export interface Article {
   summaryLanguage: string;
   /** Whether the article was marked as saved/starred in InoReader */
   isSaved: boolean;
+  /** Scraper source that collected this article (e.g. 'inoreader', 'inoreader-saved', 'feedly') */
+  scraperSource: string;
 }

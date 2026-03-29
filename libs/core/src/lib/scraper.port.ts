@@ -16,6 +16,8 @@ export interface ArticleMetadata {
   excerpt: string;
   /** Whether the article is marked as saved/starred in InoReader */
   isSaved: boolean;
+  /** Scraper source identifier (e.g. 'inoreader', 'inoreader-saved', 'feedly') */
+  scraperSource: string;
 }
 
 /**
@@ -28,6 +30,11 @@ export interface CollectResult {
   totalUnread: number;
   /** Number of unread articles remaining for future runs */
   remaining: number;
+}
+
+export interface FetchContentResult {
+  content: string | null;
+  publishedAt: string | null;
 }
 
 /**
@@ -45,11 +52,11 @@ export interface ScraperPort {
 
   /**
    * Navigates to the source URL and extracts the main content of the article.
-   * 
+   *
    * @param url The source URL of the article.
-   * @returns The full content of the article, or null if inaccessible (paywall, 4xx/5xx).
+   * @returns The full content and publication date, or null if inaccessible.
    */
-  fetchContent(url: string): Promise<string | null>;
+  fetchContent(url: string): Promise<FetchContentResult>;
 
   /**
    * Marks a specific article as read on InoReader.
