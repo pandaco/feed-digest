@@ -29,6 +29,55 @@ export interface RunPipelineOptions {
 
 const LANGUAGE_MAP: Record<string, string> = { fr: 'French', en: 'English' };
 
+function computeImportance(
+  tags: string[],
+  tagOverrides: Record<string, string>,
+  tagPrefs: Record<string, { selectionCount: number; presentedCount: number }>,
+  threshold: number,
+  minRuns: number,
+): Article['importance'] {
+  if (tags.length === 0) return 'medium';
+
+  let hasAuto = false;
+  let hasAccepted = false;
+  let allFiltered = true;
+
+  for (const tag of tags) {
+    const override = tagOverrides[tag];
+
+    if (override === 'auto') {
+      hasAuto = true;
+      allFiltered = false;
+      continue;
+    }
+
+    if (override === 'filtered') {
+      continue;
+    }
+
+    allFiltered = false;
+
+    // Score-based: if the user frequently selects this tag, it's important
+    const stats = tagPrefs[tag];
+    if (stats && stats.presentedCount >= minRuns) {
+      const score = stats.selectionCount / stats.presentedCount;
+      if (score >= threshold) hasAccepted = true;
+    }
+  }
+
+  if (hasAuto) return 'high';
+  if (allFiltered) return 'low';
+  if (hasAccepted) return 'high';
+  return 'medium';
+}
+
+interface TagPreferenceContext {
+  overrides: Record<string, string>;
+  tags: Record<string, { selectionCount: number; presentedCount: number }>;
+  threshold: number;
+  minRuns: number;
+}
+
 async function enrichAndSave(
   meta: import('@feed-digest/core').ArticleMetadata,
   index: number,
@@ -38,6 +87,7 @@ async function enrichAndSave(
   runAt: string,
   minDelayMs: number,
   maxDelayMs: number,
+  prefContext: TagPreferenceContext,
 ): Promise<Article | undefined> {
   const tag = `[${index + 1}/${total}]`;
   const jitter = Math.floor(Math.random() * (maxDelayMs - minDelayMs + 1)) + minDelayMs;
@@ -45,8 +95,10 @@ async function enrichAndSave(
   await new Promise(resolve => setTimeout(resolve, jitter));
   console.log(`[Pipeline] ${tag} Fetching content: ${meta.title} (delay: ${jitter}ms)`);
 
-  const fullContent = await options.scraper.fetchContent(meta.url);
+  const fetched = await options.scraper.fetchContent(meta.url);
+  const fullContent = fetched.content;
   const contentUnavailable = !fullContent;
+  const publishedAt = fetched.publishedAt || meta.publishedAt;
 
   console.log(`[Pipeline] ${tag} Enriching via ${options.llmProvider}...`);
   const enrichment = await options.llm.enrich({
@@ -57,9 +109,19 @@ async function enrichAndSave(
     maxTags: options.maxTags ?? 3,
   });
 
+  const importance = computeImportance(
+    enrichment.tags,
+    prefContext.overrides,
+    prefContext.tags,
+    prefContext.threshold,
+    prefContext.minRuns,
+  );
+
   const article: Article = {
     ...meta,
     ...enrichment,
+    importance,
+    publishedAt,
     runAt,
     contentUnavailable,
     llmProvider: options.llmProvider,
@@ -67,14 +129,10 @@ async function enrichAndSave(
     isSaved: meta.isSaved,
   };
 
+  console.log(`[Pipeline] ${tag} Importance: ${importance} | Stored in Inbox: ${article.title}`);
+
   await options.storage.appendToAll([article]);
-  if (article.isSaved) {
-    await options.storage.appendToSaved([article]);
-    console.log(`[Pipeline] ${tag} Saved/starred -> Saved tab (skipping Inbox): ${article.title}`);
-  } else {
-    await options.storage.appendToInbox([article]);
-    console.log(`[Pipeline] ${tag} Stored in Inbox: ${article.title}`);
-  }
+  await options.storage.appendToInbox([article]);
 
   return article;
 }
@@ -252,13 +310,27 @@ export async function runPipeline(options: RunPipelineOptions): Promise<void> {
 
     console.log(`[Pipeline] Collected ${metadata.length} articles. Processing...`);
 
+    // Load tag preferences once for importance computation
+    const threshold = parseFloat(process.env['TAG_PREFERENCE_THRESHOLD'] || '0.6');
+    const minRuns = parseInt(process.env['TAG_PREFERENCE_MIN_RUNS'] || '3', 10);
+    const prefContext: TagPreferenceContext = { overrides: {}, tags: {}, threshold, minRuns };
+
+    if (options.tagPreference && options.telegramChatId) {
+      const prefs = await options.tagPreference.get(options.telegramChatId);
+      if (prefs) {
+        prefContext.overrides = prefs.tagOverrides ?? {};
+        prefContext.tags = prefs.tags;
+        console.log(`[Pipeline] Loaded tag preferences for importance (${Object.keys(prefContext.overrides).length} overrides, ${Object.keys(prefContext.tags).length} tags)`);
+      }
+    }
+
     const limitEnrich = pLimit(concurrency);
     const limitMarkRead = pLimit(1);
 
     const results = await Promise.all(metadata.map((meta, i) => limitEnrich(async () => {
       const tag = `[${i + 1}/${metadata.length}]`;
       try {
-        const article = await enrichAndSave(meta, i, metadata.length, options, languageName, runAt, minDelayMs, maxDelayMs);
+        const article = await enrichAndSave(meta, i, metadata.length, options, languageName, runAt, minDelayMs, maxDelayMs, prefContext);
         if (article) {
           await limitMarkRead(async () => {
             console.log(`[Pipeline] ${tag} Marking as read...`);

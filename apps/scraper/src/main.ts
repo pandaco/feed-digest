@@ -1,18 +1,33 @@
 import * as dotenv from 'dotenv';
-import { InoreaderAdapter, TelegramAdapter, createStorage, createLlm, createSession, createTagPreference } from '@feed-digest/adapters';
+import { InoreaderAdapter, CompositeScraperAdapter, TelegramAdapter, createStorage, createLlm, createSession, createTagPreference } from '@feed-digest/adapters';
 import { runPipeline } from '@feed-digest/pipeline';
 import { ScraperPort } from '@feed-digest/core';
 
 dotenv.config();
 
-function createScraper(): ScraperPort {
-  const source = process.env['SCRAPER_SOURCE'] || 'inoreader';
+function createSingleScraper(source: string): ScraperPort {
   switch (source) {
     case 'inoreader':
-      return new InoreaderAdapter();
+      return new InoreaderAdapter(process.cwd(), 'unread');
+    case 'inoreader-saved':
+      return new InoreaderAdapter(process.cwd(), 'starred');
     default:
-      throw new Error(`[Main] Unknown SCRAPER_SOURCE: "${source}". Supported: inoreader`);
+      throw new Error(`[Main] Unknown SCRAPER_SOURCE: "${source}". Supported: inoreader, inoreader-saved`);
   }
+}
+
+function createScraper(): ScraperPort {
+  const sources = (process.env['SCRAPER_SOURCE'] || 'inoreader')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (sources.length === 1) {
+    return createSingleScraper(sources[0]);
+  }
+
+  console.log(`[Main] Multiple scraper sources: ${sources.join(', ')}`);
+  return new CompositeScraperAdapter(sources.map(createSingleScraper));
 }
 
 function isWithinScheduledWindow(): boolean {
