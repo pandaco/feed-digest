@@ -185,6 +185,7 @@ export class NotionAdapter implements StoragePort {
 
   async updateArticle(article: Article): Promise<void> {
     const dbIds = [this.inboxDbId, this.allDbId, this.savedDbId];
+    let includeScraperSource = true;
 
     for (const dataSourceId of dbIds) {
       const results = await this.queryDatabase(dataSourceId, {
@@ -195,32 +196,33 @@ export class NotionAdapter implements StoragePort {
       for (const page of results.results) {
         if (!('id' in page)) continue;
         console.log(`[NotionAdapter] Updating article ${article.id} in page ${page.id}...`);
-        await this.client.pages.update({
-          page_id: page.id,
-          properties: {
-            'Title': {
-              title: [{ text: { content: article.title } }],
-            },
-            'Tags': {
-              rich_text: [{ text: { content: article.tags.join(', ') } }],
-            },
-            'Summary': {
-              rich_text: [{ text: { content: article.summary.substring(0, 2000) } }],
-            },
-            'Importance': {
-              rich_text: [{ text: { content: article.importance } }],
-            },
-            'Content Unavailable': {
-              checkbox: article.contentUnavailable,
-            },
-            'LLM Provider': {
-              rich_text: [{ text: { content: article.llmProvider } }],
-            },
-            'Summary Language': {
-              rich_text: [{ text: { content: article.summaryLanguage } }],
-            },
-          } as any,
-        });
+
+        const updateProps: Record<string, any> = {
+          'Title': { title: [{ text: { content: article.title } }] },
+          'Published At': { rich_text: [{ text: { content: article.publishedAt } }] },
+          'Tags': { rich_text: [{ text: { content: article.tags.join(', ') } }] },
+          'Summary': { rich_text: [{ text: { content: article.summary.substring(0, 2000) } }] },
+          'Importance': { rich_text: [{ text: { content: article.importance } }] },
+          'Content Unavailable': { checkbox: article.contentUnavailable },
+          'LLM Provider': { rich_text: [{ text: { content: article.llmProvider } }] },
+          'Summary Language': { rich_text: [{ text: { content: article.summaryLanguage } }] },
+        };
+        if (includeScraperSource) {
+          updateProps['Scraper Source'] = { rich_text: [{ text: { content: article.scraperSource || '' } }] };
+        }
+
+        try {
+          await this.client.pages.update({ page_id: page.id, properties: updateProps as any });
+        } catch (err: any) {
+          if (includeScraperSource && err?.message?.includes('Scraper Source is not a property')) {
+            console.warn('[NotionAdapter] "Scraper Source" property not found, skipping it.');
+            includeScraperSource = false;
+            delete updateProps['Scraper Source'];
+            await this.client.pages.update({ page_id: page.id, properties: updateProps as any });
+          } else {
+            throw err;
+          }
+        }
       }
     }
   }
@@ -240,6 +242,7 @@ export class NotionAdapter implements StoragePort {
       llmProvider: this.getRichText(props['LLM Provider']) as Article['llmProvider'],
       summaryLanguage: this.getRichText(props['Summary Language']),
       isSaved: false,
+      scraperSource: this.getRichText(props['Scraper Source']),
     };
   }
 
@@ -266,54 +269,53 @@ export class NotionAdapter implements StoragePort {
     return articles;
   }
 
+  private buildArticleProperties(article: Article, includeScraperSource = true): Record<string, any> {
+    const props: Record<string, any> = {
+      'Title': { title: [{ text: { content: article.title } }] },
+      'Article ID': { rich_text: [{ text: { content: article.id } }] },
+      'Run At': { rich_text: [{ text: { content: article.runAt } }] },
+      'Published At': { rich_text: [{ text: { content: article.publishedAt } }] },
+      'Source': { rich_text: [{ text: { content: article.feedSource } }] },
+      'URL': { url: article.url },
+      'Tags': { rich_text: [{ text: { content: article.tags.join(', ') } }] },
+      'Summary': { rich_text: [{ text: { content: article.summary.substring(0, 2000) } }] },
+      'Importance': { rich_text: [{ text: { content: article.importance } }] },
+      'Content Unavailable': { checkbox: article.contentUnavailable },
+      'LLM Provider': { rich_text: [{ text: { content: article.llmProvider } }] },
+      'Summary Language': { rich_text: [{ text: { content: article.summaryLanguage } }] },
+    };
+    if (includeScraperSource) {
+      props['Scraper Source'] = { rich_text: [{ text: { content: article.scraperSource || '' } }] };
+    }
+    return props;
+  }
+
   private async appendArticles(databaseId: string, articles: Article[]): Promise<void> {
     if (articles.length === 0) {
       console.log('[NotionAdapter] No articles to append.');
       return;
     }
 
+    let includeScraperSource = true;
+
     for (const article of articles) {
-      await this.client.pages.create({
-        parent: { database_id: databaseId },
-        properties: {
-          'Title': {
-            title: [{ text: { content: article.title } }],
-          },
-          'Article ID': {
-            rich_text: [{ text: { content: article.id } }],
-          },
-          'Run At': {
-            rich_text: [{ text: { content: article.runAt } }],
-          },
-          'Published At': {
-            rich_text: [{ text: { content: article.publishedAt } }],
-          },
-          'Source': {
-            rich_text: [{ text: { content: article.feedSource } }],
-          },
-          'URL': {
-            url: article.url,
-          },
-          'Tags': {
-            rich_text: [{ text: { content: article.tags.join(', ') } }],
-          },
-          'Summary': {
-            rich_text: [{ text: { content: article.summary.substring(0, 2000) } }],
-          },
-          'Importance': {
-            rich_text: [{ text: { content: article.importance } }],
-          },
-          'Content Unavailable': {
-            checkbox: article.contentUnavailable,
-          },
-          'LLM Provider': {
-            rich_text: [{ text: { content: article.llmProvider } }],
-          },
-          'Summary Language': {
-            rich_text: [{ text: { content: article.summaryLanguage } }],
-          },
-        },
-      });
+      try {
+        await this.client.pages.create({
+          parent: { database_id: databaseId },
+          properties: this.buildArticleProperties(article, includeScraperSource),
+        });
+      } catch (err: any) {
+        if (includeScraperSource && err?.message?.includes('Scraper Source is not a property')) {
+          console.warn('[NotionAdapter] "Scraper Source" property not found in database, skipping it.');
+          includeScraperSource = false;
+          await this.client.pages.create({
+            parent: { database_id: databaseId },
+            properties: this.buildArticleProperties(article, false),
+          });
+        } else {
+          throw err;
+        }
+      }
     }
 
     console.log(`[NotionAdapter] Appended ${articles.length} articles.`);

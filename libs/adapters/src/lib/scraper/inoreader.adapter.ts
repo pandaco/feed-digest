@@ -3,7 +3,9 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
-import { ScraperPort, CollectResult, ArticleMetadata } from '@feed-digest/core';
+import { ScraperPort, CollectResult, ArticleMetadata, FetchContentResult } from '@feed-digest/core';
+
+type InoreaderMode = 'unread' | 'starred';
 
 interface RawArticleLink {
   title: string;
@@ -19,9 +21,11 @@ export class InoreaderAdapter implements ScraperPort {
   private mainPage: Page | null = null;
   private markReadPage: Page | null = null;
   private readonly sessionPath: string;
+  private readonly mode: InoreaderMode;
 
-  constructor(sessionDir: string = process.cwd()) {
+  constructor(sessionDir: string = process.cwd(), mode: InoreaderMode = 'unread') {
     this.sessionPath = join(sessionDir, 'session.json');
+    this.mode = mode;
   }
 
   private async getPage(): Promise<Page> {
@@ -149,6 +153,7 @@ export class InoreaderAdapter implements ScraperPort {
           publishedAt: new Date().toISOString(),
           excerpt: '',
           isSaved: a.isSaved,
+          scraperSource: this.mode === 'starred' ? 'inoreader-saved' : 'inoreader',
         });
       }
 
@@ -187,26 +192,29 @@ export class InoreaderAdapter implements ScraperPort {
     try {
       await this.ensureAuthenticated(page);
 
-      console.log('[InoreaderAdapter] Navigating to /all_articles...');
-      await page.goto('https://www.inoreader.com/all_articles');
+      const target = this.mode === 'starred'
+        ? 'https://www.inoreader.com/starred'
+        : 'https://www.inoreader.com/all_articles';
+
+      console.log(`[InoreaderAdapter] Navigating to ${target} (mode: ${this.mode})...`);
+      await page.goto(target);
       await this.waitForArticlePane(page);
 
       const articles = await this.scrollAndCollect(page, limit);
-      const totalUnread = await this.getUnreadCount(page);
-
-      console.log(`[InoreaderAdapter] Total unread found in UI: ${totalUnread}`);
+      const totalCount = await this.getUnreadCount(page);
+      console.log(`[InoreaderAdapter] Total found in UI: ${totalCount}`);
 
       return {
         articles,
-        totalUnread,
-        remaining: Math.max(0, totalUnread - articles.length),
+        totalUnread: totalCount,
+        remaining: Math.max(0, totalCount - articles.length),
       };
     } finally {
       await page.close();
     }
   }
 
-  async fetchContent(url: string): Promise<string | null> {
+  async fetchContent(url: string): Promise<FetchContentResult> {
     const context = await this.getContext();
     const page = await context.newPage();
 
@@ -214,16 +222,65 @@ export class InoreaderAdapter implements ScraperPort {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
       const html = await page.content();
       const doc = new JSDOM(html, { url });
+
+      const publishedAt = this.extractPublishedDate(doc.window.document);
+
       const reader = new Readability(doc.window.document);
       const article = reader.parse();
 
-      return article?.textContent?.trim() || null;
+      return {
+        content: article?.textContent?.trim() || null,
+        publishedAt,
+      };
     } catch (error) {
       console.warn(`[InoreaderAdapter] Failed to fetch content for ${url}:`, error);
-      return null;
+      return { content: null, publishedAt: null };
     } finally {
       await page.close();
     }
+  }
+
+  private extractPublishedDate(document: Document): string | null {
+    const selectors = [
+      'meta[property="article:published_time"]',
+      'meta[property="og:article:published_time"]',
+      'meta[name="date"]',
+      'meta[name="pubdate"]',
+      'meta[name="publish_date"]',
+      'meta[name="DC.date.issued"]',
+      'meta[itemprop="datePublished"]',
+      'time[datetime]',
+      '[itemprop="datePublished"]',
+    ];
+
+    for (const selector of selectors) {
+      const el = document.querySelector(selector);
+      if (!el) continue;
+
+      const raw = el.getAttribute('content') || el.getAttribute('datetime') || el.textContent?.trim();
+      if (!raw) continue;
+
+      const date = new Date(raw);
+      if (!isNaN(date.getTime())) return date.toISOString();
+    }
+
+    // Try JSON-LD
+    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    for (const script of scripts) {
+      try {
+        const json = JSON.parse(script.textContent || '');
+        const candidates = Array.isArray(json) ? json : [json];
+        for (const item of candidates) {
+          const raw = item.datePublished || item.dateCreated;
+          if (raw) {
+            const date = new Date(raw);
+            if (!isNaN(date.getTime())) return date.toISOString();
+          }
+        }
+      } catch { /* ignore malformed JSON-LD */ }
+    }
+
+    return null;
   }
 
   private async initMarkReadPage(): Promise<Page> {
@@ -242,7 +299,10 @@ export class InoreaderAdapter implements ScraperPort {
       }
     });
 
-    await this.markReadPage.goto('https://www.inoreader.com/all_articles', { waitUntil: 'domcontentloaded' });
+    const targetUrl = this.mode === 'starred'
+      ? 'https://www.inoreader.com/starred'
+      : 'https://www.inoreader.com/all_articles';
+    await this.markReadPage.goto(targetUrl, { waitUntil: 'domcontentloaded' });
     await this.markReadPage.waitForTimeout(3000);
 
     return this.markReadPage;
@@ -260,7 +320,10 @@ export class InoreaderAdapter implements ScraperPort {
   }
 
   async markAsRead(articleId: string, url: string): Promise<void> {
-    console.log(`[InoreaderAdapter] Attempting to mark article ${articleId} as read...`);
+    const action = this.mode === 'starred' ? 'unstar' : 'mark-as-read';
+    const key = this.mode === 'starred' ? 's' : 'm';
+
+    console.log(`[InoreaderAdapter] Attempting to ${action} article ${articleId}...`);
     const page = await this.initMarkReadPage();
 
     try {
@@ -275,13 +338,13 @@ export class InoreaderAdapter implements ScraperPort {
         await container.scrollIntoViewIfNeeded();
         await container.click({ position: { x: 10, y: 15 } });
         await page.waitForTimeout(300);
-        await page.keyboard.press('m');
-        console.log(`[InoreaderAdapter] Successfully marked as read: ${url}`);
+        await page.keyboard.press(key);
+        console.log(`[InoreaderAdapter] Successfully ${action}: ${url}`);
       } else {
         console.warn(`[InoreaderAdapter] Could not find article after scrolling: ${url}`);
       }
     } catch (error) {
-      console.error(`[InoreaderAdapter] Failed to mark as read ${url}:`, error);
+      console.error(`[InoreaderAdapter] Failed to ${action} ${url}:`, error);
     }
   }
 

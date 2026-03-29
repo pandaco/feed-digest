@@ -52,7 +52,8 @@ export class GoogleSheetsAdapter implements StoragePort {
         console.log(`[GoogleSheetsAdapter] Tab "${tab}" is empty. Writing headers...`);
         const headers = [
           'ID', 'Run At', 'Published At', 'Source', 'Title', 'URL', 'Tags',
-          'Summary', 'Importance', 'Content Unavailable', 'LLM Provider', 'Summary Language'
+          'Summary', 'Importance', 'Content Unavailable', 'LLM Provider', 'Summary Language',
+          'Scraper Source'
         ];
         await this.writeHeaders(tab, headers);
       }
@@ -92,7 +93,7 @@ export class GoogleSheetsAdapter implements StoragePort {
   async getFromSaved(): Promise<Article[]> {
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: 'Saved!A:L',
+      range: 'Saved!A:M',
     });
 
     const rows = response.data.values;
@@ -106,7 +107,7 @@ export class GoogleSheetsAdapter implements StoragePort {
 
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: 'Saved!A:L',
+      range: 'Saved!A:M',
     });
 
     const rows = response.data.values;
@@ -120,7 +121,7 @@ export class GoogleSheetsAdapter implements StoragePort {
 
     await this.sheets.spreadsheets.values.clear({
       spreadsheetId: this.spreadsheetId,
-      range: 'Saved!A:L',
+      range: 'Saved!A:M',
     });
 
     await this.sheets.spreadsheets.values.update({
@@ -153,6 +154,7 @@ export class GoogleSheetsAdapter implements StoragePort {
       a.contentUnavailable ? 'TRUE' : 'FALSE',
       a.llmProvider,
       a.summaryLanguage,
+      a.scraperSource || '',
     ]);
 
     const result = await this.sheets.spreadsheets.values.append({
@@ -170,7 +172,7 @@ export class GoogleSheetsAdapter implements StoragePort {
 
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: 'Inbox!A:L',
+      range: 'Inbox!A:M',
     });
 
     const rows = response.data.values;
@@ -186,7 +188,7 @@ export class GoogleSheetsAdapter implements StoragePort {
     // Clear and rewrite
     await this.sheets.spreadsheets.values.clear({
       spreadsheetId: this.spreadsheetId,
-      range: 'Inbox!A:L',
+      range: 'Inbox!A:M',
     });
 
     await this.sheets.spreadsheets.values.update({
@@ -200,7 +202,7 @@ export class GoogleSheetsAdapter implements StoragePort {
   async getFromInbox(): Promise<Article[]> {
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: 'Inbox!A:L',
+      range: 'Inbox!A:M',
     });
 
     const rows = response.data.values;
@@ -223,7 +225,7 @@ export class GoogleSheetsAdapter implements StoragePort {
     for (const tab of tabs) {
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${tab}!A:L`,
+        range: `${tab}!A:M`,
       });
 
       const rows = response.data.values;
@@ -251,6 +253,7 @@ export class GoogleSheetsAdapter implements StoragePort {
         article.contentUnavailable ? 'TRUE' : 'FALSE',
         article.llmProvider,
         article.summaryLanguage,
+        article.scraperSource || '',
       ];
 
       dataRows[articleIndex] = updatedRow;
@@ -288,6 +291,7 @@ export class GoogleSheetsAdapter implements StoragePort {
       llmProvider: row[10] as any,
       summaryLanguage: row[11],
       isSaved: false,
+      scraperSource: row[12] || '',
     };
   }
 }

@@ -12,22 +12,20 @@ export class ClaudeAdapter implements LlmPort {
   }
 
   async enrich(input: EnrichInput): Promise<EnrichOutput> {
-    const systemPrompt = `You are an information and technology watch assistant. 
+    const systemPrompt = `You are an information and technology watch assistant.
       Respond ONLY with a valid JSON object, no markdown, no comments.
       Rules:
       - summary: written in ${input.language}, 3 to 5 sentences, factual and concise.
-      - tags: up to ${input.maxTags} tags in ${input.language}, freely inferred from content (main topics, technologies, themes).
-      - importance: high = critical or highly impactful / medium = interesting but not urgent / low = anecdotal.`;
+      - tags: up to ${input.maxTags} tags in ${input.language}, freely inferred from content (main topics, technologies, themes).`;
 
     const userPrompt = `Here is the content of an article:
       <title>${input.title}</title>
       <content>${input.content}</content>
-      
+
       Respond with the following JSON format:
       {
         "summary": "...",
-        "tags": ["..."],
-        "importance": "high|medium|low"
+        "tags": ["..."]
       }`;
 
     try {
@@ -126,7 +124,6 @@ ${items}`;
     return {
       summary: title,
       tags: [],
-      importance: 'low',
     };
   }
 

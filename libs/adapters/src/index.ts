@@ -1,4 +1,5 @@
 export * from './lib/scraper/inoreader.adapter';
+export * from './lib/scraper/composite-scraper.adapter';
 export * from './lib/storage/google-sheets.adapter';
 export * from './lib/storage/notion.adapter';
 export * from './lib/llm/claude.adapter';

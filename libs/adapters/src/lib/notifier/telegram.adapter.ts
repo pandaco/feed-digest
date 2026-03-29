@@ -71,7 +71,12 @@ export class TelegramAdapter implements NotifierPort {
 
     let message = `<b>${i18n.sourceStatsTitle}</b>\n\n`;
     for (const [source, count] of sorted) {
-      message += `${source} : ${count}\n`;
+      const line = `${source} : ${count}\n`;
+      if (message.length + line.length > 4000) {
+        message += '…\n';
+        break;
+      }
+      message += line;
     }
 
     await this.bot.sendMessage(this.chatId, message, { parse_mode: 'HTML' });
@@ -144,7 +149,12 @@ export class TelegramAdapter implements NotifierPort {
     let message = `${i18n.tagArticles(tagName)}\n\n`;
 
     for (const article of articles) {
-      message += `• <a href="${article.url}">${article.title}</a>\n`;
+      const line = `• <a href="${article.url}">${article.title}</a>\n`;
+      if (message.length + line.length > 4000) {
+        message += '…\n';
+        break;
+      }
+      message += line;
     }
 
     await this.bot.sendMessage(this.chatId, message, {
@@ -159,7 +169,12 @@ export class TelegramAdapter implements NotifierPort {
     let message = `<b>${i18n.savedArticlesTitle} (${articles.length})</b>\n\n`;
 
     for (const article of articles) {
-      message += `• <a href="${article.url}">${article.title}</a>\n`;
+      const line = `• <a href="${article.url}">${article.title}</a>\n`;
+      if (message.length + line.length > 4000) {
+        message += '…\n';
+        break;
+      }
+      message += line;
     }
 
     await this.bot.sendMessage(this.chatId, message, {
