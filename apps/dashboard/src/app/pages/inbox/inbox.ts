@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { InboxService, Article } from '../../services/inbox.service';
 import { TagPreferenceService } from '../../services/tag-preference.service';
@@ -8,6 +8,7 @@ import { formatDate } from '../../shared/format';
 type ImportanceFilter = 'all' | 'high' | 'medium' | 'low';
 type SortField = 'publishedAt' | 'runAt' | 'importance';
 type SortDirection = 'asc' | 'desc';
+type TimeGranularity = 'day' | 'week' | 'month' | 'year';
 
 interface TagWithCount {
   name: string;
@@ -44,14 +45,20 @@ export class InboxComponent {
   searchQuery = signal('');
   importanceFilter = signal<ImportanceFilter>('all');
   sourceFilter = signal('all');
+  scraperSourceFilter = signal('all');
   selectedTags = signal<Set<string>>(new Set());
   sortField = signal<SortField>('publishedAt');
-  sortDirection = signal<SortDirection>('desc');
+  sortDirection = signal<SortDirection>('asc');
   expandedId = signal<string | null>(null);
   selectedIds = signal<Set<string>>(new Set());
   deletingIds = signal<Set<string>>(new Set());
   savingIds = signal<Set<string>>(new Set());
   showAllTags = signal(false);
+  showAdvancedFilters = signal(false);
+  showHelp = signal(false);
+  focusedIndex = signal(-1);
+  timeGranularity = signal<TimeGranularity>('day');
+  timeFilter = signal<{ start: string; end: string } | null>(null);
 
   // Tag preference states
   tagStates = signal<Record<string, string>>({});
@@ -68,6 +75,14 @@ export class InboxComponent {
 
   uniqueSources = computed(() =>
     [...new Set(this.articles().map(a => a.feedSource))].sort()
+  );
+
+  uniqueScraperSources = computed(() =>
+    [...new Set(this.articles().map(a => a.scraperSource).filter(Boolean))].sort()
+  );
+
+  hasActiveAdvancedFilters = computed(() =>
+    this.scraperSourceFilter() !== 'all' || this.selectedTags().size > 0
   );
 
   tagCounts = computed<TagWithCount[]>(() => {
@@ -100,20 +115,84 @@ export class InboxComponent {
     return top.length > 0 ? top[0].count : 1;
   });
 
-  topSources = computed(() => {
+  topSourcesList = computed(() => {
     const counts: Record<string, number> = {};
     for (const a of this.articles()) {
       counts[a.feedSource] = (counts[a.feedSource] || 0) + 1;
     }
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([name, count]) => `${name} (${count})`)
-      .join(', ');
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, count }));
+  });
+
+  maxSourceCount = computed(() => {
+    const s = this.topSourcesList();
+    return s.length > 0 ? s[0].count : 1;
+  });
+
+  // Temporal histogram
+  timeBuckets = computed(() => {
+    const articles = this.articles();
+    const granularity = this.timeGranularity();
+    const buckets: Record<string, { label: string; count: number; start: string; end: string }> = {};
+
+    for (const a of articles) {
+      const d = new Date(a.publishedAt);
+      if (isNaN(d.getTime())) continue;
+
+      let key: string;
+      let label: string;
+      let start: Date;
+      let end: Date;
+
+      if (granularity === 'day') {
+        key = d.toISOString().slice(0, 10);
+        label = key.slice(5); // MM-DD
+        start = new Date(key + 'T00:00:00.000Z');
+        end = new Date(start); end.setUTCDate(end.getUTCDate() + 1);
+      } else if (granularity === 'week') {
+        const day = new Date(d);
+        day.setUTCDate(day.getUTCDate() - day.getUTCDay() + 1);
+        key = day.toISOString().slice(0, 10);
+        label = 'W' + key.slice(5);
+        start = new Date(key + 'T00:00:00.000Z');
+        end = new Date(start); end.setUTCDate(end.getUTCDate() + 7);
+      } else if (granularity === 'month') {
+        key = d.toISOString().slice(0, 7);
+        label = key;
+        start = new Date(key + '-01T00:00:00.000Z');
+        end = new Date(start); end.setUTCMonth(end.getUTCMonth() + 1);
+      } else {
+        key = d.getUTCFullYear().toString();
+        label = key;
+        start = new Date(key + '-01-01T00:00:00.000Z');
+        end = new Date(start); end.setUTCFullYear(end.getUTCFullYear() + 1);
+      }
+
+      if (!buckets[key]) {
+        buckets[key] = { label, count: 0, start: start.toISOString(), end: end.toISOString() };
+      }
+      buckets[key].count++;
+    }
+
+    return Object.entries(buckets)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([, v]) => v);
+  });
+
+  maxBucketCount = computed(() => {
+    const b = this.timeBuckets();
+    return b.length > 0 ? Math.max(...b.map(x => x.count)) : 1;
   });
 
   filteredArticles = computed(() => {
     let result = this.articles();
+
+    const tf = this.timeFilter();
+    if (tf) {
+      result = result.filter(a => a.publishedAt >= tf.start && a.publishedAt < tf.end);
+    }
 
     const importance = this.importanceFilter();
     if (importance !== 'all') {
@@ -123,6 +202,11 @@ export class InboxComponent {
     const source = this.sourceFilter();
     if (source !== 'all') {
       result = result.filter(a => a.feedSource === source);
+    }
+
+    const scraperSource = this.scraperSourceFilter();
+    if (scraperSource !== 'all') {
+      result = result.filter(a => a.scraperSource === scraperSource);
     }
 
     const tags = this.selectedTags();
@@ -347,11 +431,11 @@ export class InboxComponent {
     });
   }
 
-  generateSummary(): void {
+  generateSummary(period?: string): void {
     this.summaryLoading.set(true);
     this.error.set(null);
 
-    this.service.generateSummary().subscribe({
+    this.service.generateSummary(period).subscribe({
       next: (res) => {
         this.summaryHtml.set(res.html);
         this.summaryLoading.set(false);
@@ -399,6 +483,127 @@ export class InboxComponent {
   sortIcon(field: SortField): string {
     if (this.sortField() !== field) return '  ';
     return this.sortDirection() === 'asc' ? ' \u25B2' : ' \u25BC';
+  }
+
+  // Temporal histogram
+  toggleTimeBucket(bucket: { start: string; end: string }): void {
+    const current = this.timeFilter();
+    if (current && current.start === bucket.start && current.end === bucket.end) {
+      this.timeFilter.set(null);
+    } else {
+      this.timeFilter.set({ start: bucket.start, end: bucket.end });
+    }
+    this.selectedIds.set(new Set());
+  }
+
+  isTimeBucketActive(bucket: { start: string; end: string }): boolean {
+    const tf = this.timeFilter();
+    return !!tf && tf.start === bucket.start && tf.end === bucket.end;
+  }
+
+  clearTimeFilter(): void {
+    this.timeFilter.set(null);
+  }
+
+  // Keyboard shortcuts
+  @HostListener('document:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent): void {
+    if (this.showHelp()) {
+      if (event.key === 'Escape' || event.key === '?') {
+        this.showHelp.set(false);
+        event.preventDefault();
+      }
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
+
+    const articles = this.filteredArticles();
+    if (articles.length === 0) return;
+
+    switch (event.key) {
+      case '?':
+        this.showHelp.set(true);
+        event.preventDefault();
+        break;
+      case 'j':
+      case 'ArrowDown':
+        this.focusedIndex.update(i => Math.min(i + 1, articles.length - 1));
+        this.scrollToFocused();
+        event.preventDefault();
+        break;
+      case 'k':
+      case 'ArrowUp':
+        this.focusedIndex.update(i => Math.max(i - 1, 0));
+        this.scrollToFocused();
+        event.preventDefault();
+        break;
+      case 'x':
+        this.toggleFocusedSelect(articles);
+        event.preventDefault();
+        break;
+      case 'Enter':
+        this.toggleFocusedExpand(articles);
+        event.preventDefault();
+        break;
+      case 's':
+        this.actionFocused(articles, 'save');
+        event.preventDefault();
+        break;
+      case 'd':
+        this.actionFocused(articles, 'delete');
+        event.preventDefault();
+        break;
+      case 'Escape':
+        this.expandedId.set(null);
+        event.preventDefault();
+        break;
+    }
+  }
+
+  private scrollToFocused(): void {
+    const idx = this.focusedIndex();
+    const row = document.querySelector(`[data-row-index="${idx}"]`);
+    if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  private toggleFocusedSelect(articles: Article[]): void {
+    const idx = this.focusedIndex();
+    if (idx >= 0 && idx < articles.length) {
+      this.toggleSelect(articles[idx].id);
+    }
+  }
+
+  private toggleFocusedExpand(articles: Article[]): void {
+    const idx = this.focusedIndex();
+    if (idx >= 0 && idx < articles.length) {
+      this.toggleExpand(articles[idx].id);
+    }
+  }
+
+  private actionFocused(articles: Article[], action: 'save' | 'delete'): void {
+    const idx = this.focusedIndex();
+    if (idx < 0 || idx >= articles.length) return;
+    const article = articles[idx];
+    if (action === 'save') {
+      this.saveArticle(article);
+    } else {
+      if (this.deletingIds().has(article.id)) return;
+      this.deletingIds.update(set => new Set(set).add(article.id));
+      this.service.deleteArticle(article.id).subscribe({
+        next: () => {
+          this.articles.update(list => list.filter(a => a.id !== article.id));
+          this.selectedIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
+          this.deletingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
+          if (this.expandedId() === article.id) this.expandedId.set(null);
+        },
+        error: () => {
+          this.deletingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
+          this.error.set(`Failed to delete "${article.title}"`);
+        },
+      });
+    }
   }
 
   formatDate = formatDate;

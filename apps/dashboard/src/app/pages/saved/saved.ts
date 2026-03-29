@@ -34,13 +34,15 @@ export class SavedComponent {
   searchQuery = signal('');
   importanceFilter = signal<ImportanceFilter>('all');
   sourceFilter = signal('all');
+  scraperSourceFilter = signal('all');
   selectedTags = signal<Set<string>>(new Set());
   sortField = signal<SortField>('publishedAt');
-  sortDirection = signal<SortDirection>('desc');
+  sortDirection = signal<SortDirection>('asc');
   expandedId = signal<string | null>(null);
   selectedIds = signal<Set<string>>(new Set());
   deletingIds = signal<Set<string>>(new Set());
   showAllTags = signal(false);
+  showAdvancedFilters = signal(false);
 
   // Stats
   totalCount = computed(() => this.articles().length);
@@ -50,6 +52,14 @@ export class SavedComponent {
 
   uniqueSources = computed(() =>
     [...new Set(this.articles().map(a => a.feedSource))].sort()
+  );
+
+  uniqueScraperSources = computed(() =>
+    [...new Set(this.articles().map(a => a.scraperSource).filter(Boolean))].sort()
+  );
+
+  hasActiveAdvancedFilters = computed(() =>
+    this.scraperSourceFilter() !== 'all' || this.selectedTags().size > 0
   );
 
   sourceCounts = computed(() => {
@@ -116,6 +126,11 @@ export class SavedComponent {
     const source = this.sourceFilter();
     if (source !== 'all') {
       result = result.filter(a => a.feedSource === source);
+    }
+
+    const scraperSource = this.scraperSourceFilter();
+    if (scraperSource !== 'all') {
+      result = result.filter(a => a.scraperSource === scraperSource);
     }
 
     const tags = this.selectedTags();

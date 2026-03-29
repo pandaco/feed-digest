@@ -81,28 +81,6 @@
       </section>
     </div>
 
-    <!-- Tag filter chips -->
-    <section class="tag-filter-section">
-      <span class="tag-filter-label">Filter by tags:</span>
-      <div class="tag-chips">
-        @for (tag of visibleTags(); track tag.name) {
-          <button
-            class="tag-chip"
-            [class.active]="isTagSelected(tag.name)"
-            (click)="toggleTag(tag.name)"
-          >{{ tag.name }} ({{ tag.count }})</button>
-        }
-        @if (hiddenTagCount() > 0) {
-          <button class="tag-chip tag-chip-more" (click)="toggleShowAllTags()">
-            {{ showAllTags() ? 'Show less' : '+' + hiddenTagCount() + ' more' }}
-          </button>
-        }
-        @if (selectedTags().size > 0) {
-          <button class="tag-chip tag-chip-clear" (click)="clearTagFilter()">Clear</button>
-        }
-      </div>
-    </section>
-
     <!-- Table -->
     <section class="table-section">
       <div class="table-header">
@@ -136,8 +114,56 @@
             [ngModel]="searchQuery()"
             (ngModelChange)="searchQuery.set($event)"
           />
+
+          <button
+            class="btn-toggle-filters"
+            [class.active]="showAdvancedFilters() || hasActiveAdvancedFilters()"
+            (click)="showAdvancedFilters.update(v => !v)"
+            title="More filters"
+          >
+            {{ showAdvancedFilters() ? 'Less filters' : 'More filters' }}
+            @if (hasActiveAdvancedFilters() && !showAdvancedFilters()) {
+              <span class="filter-badge"></span>
+            }
+          </button>
         </div>
       </div>
+
+      <!-- Advanced filters panel -->
+      @if (showAdvancedFilters()) {
+        <div class="advanced-filters">
+          <div class="advanced-filter-row">
+            <label class="advanced-filter-label">Scraper:</label>
+            <select class="filter-select" [ngModel]="scraperSourceFilter()" (ngModelChange)="scraperSourceFilter.set($event)">
+              <option value="all">All Scrapers</option>
+              @for (src of uniqueScraperSources(); track src) {
+                <option [value]="src">{{ src }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="advanced-filter-row advanced-filter-tags">
+            <label class="advanced-filter-label">Tags:</label>
+            <div class="tag-chips">
+              @for (tag of visibleTags(); track tag.name) {
+                <button
+                  class="tag-chip"
+                  [class.active]="isTagSelected(tag.name)"
+                  (click)="toggleTag(tag.name)"
+                >{{ tag.name }} ({{ tag.count }})</button>
+              }
+              @if (hiddenTagCount() > 0) {
+                <button class="tag-chip tag-chip-more" (click)="toggleShowAllTags()">
+                  {{ showAllTags() ? 'Show less' : '+' + hiddenTagCount() + ' more' }}
+                </button>
+              }
+              @if (selectedTags().size > 0) {
+                <button class="tag-chip tag-chip-clear" (click)="clearTagFilter()">Clear</button>
+              }
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Bulk action bar -->
       @if (selectedCount() > 0) {
@@ -165,12 +191,11 @@
               />
             </th>
             <th class="col-expand"></th>
-            <th>Title</th>
-            <th>Source</th>
-            <th>Tags</th>
-            <th class="sortable" (click)="toggleSort('publishedAt')">
+            <th class="sortable col-published" (click)="toggleSort('publishedAt')">
               Published{{ sortIcon('publishedAt') }}
             </th>
+            <th>Title</th>
+            <th>Tags</th>
             <th class="col-actions"></th>
           </tr>
         </thead>
@@ -191,19 +216,19 @@
                   {{ expandedId() === article.id ? '\u25BC' : '\u25B6' }}
                 </button>
               </td>
-              <td class="article-title">
+              <td class="col-published">{{ formatDate(article.publishedAt) }}</td>
+              <td class="article-title" [title]="article.title">
                 <a [href]="article.url" target="_blank" rel="noopener">{{ article.title }}</a>
                 @if (article.contentUnavailable) {
                   <span class="badge badge-warning" title="Full content could not be fetched">!</span>
                 }
+                <span class="article-source">{{ article.feedSource }}</span>
               </td>
-              <td class="article-source">{{ article.feedSource }}</td>
               <td class="article-tags">
                 @for (tag of article.tags; track tag) {
                   <span class="badge badge-tag">{{ tag }}</span>
                 }
               </td>
-              <td>{{ formatDate(article.publishedAt) }}</td>
               <td class="col-actions">
                 <button class="btn-icon btn-icon-danger" title="Remove from saved" (click)="deleteArticle(article)" [disabled]="isDeleting(article.id)">
                   {{ isDeleting(article.id) ? '...' : '\u2715' }}
@@ -212,7 +237,7 @@
             </tr>
             @if (expandedId() === article.id) {
               <tr class="detail-row">
-                <td colspan="7">
+                <td colspan="6">
                   <div class="detail-content">
                     <div class="detail-summary">
                       <h3>Summary</h3>
@@ -238,6 +263,10 @@
                       <div class="meta-item">
                         <span class="meta-label">Language</span>
                         <span class="meta-value">{{ article.summaryLanguage }}</span>
+                      </div>
+                      <div class="meta-item">
+                        <span class="meta-label">Scraper Source</span>
+                        <span class="meta-value">{{ article.scraperSource || '-' }}</span>
                       </div>
                       <div class="meta-item">
                         <span class="meta-label">Content</span>

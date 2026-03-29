@@ -1,11 +1,33 @@
 <div class="container">
-  <h1>Inbox</h1>
-
-  <div class="page-actions">
-    <button class="btn btn-primary" (click)="loadInbox()" [disabled]="loading()">
-      {{ loading() ? 'Loading...' : 'Load Inbox' }}
-    </button>
+  <div class="page-header">
+    <h1>Inbox</h1>
+    <div class="page-actions">
+      <button class="btn btn-primary" (click)="loadInbox()" [disabled]="loading()">
+        {{ loading() ? 'Loading...' : 'Load Inbox' }}
+      </button>
+      <button class="btn-help" (click)="showHelp.set(true)" title="Keyboard shortcuts (?)">?</button>
+    </div>
   </div>
+
+  <!-- Keyboard shortcuts help -->
+  @if (showHelp()) {
+    <div class="help-overlay" (click)="showHelp.set(false)">
+      <div class="help-modal" (click)="$event.stopPropagation()">
+        <h2>Keyboard Shortcuts</h2>
+        <div class="help-grid">
+          <kbd>j</kbd><span>Next article</span>
+          <kbd>k</kbd><span>Previous article</span>
+          <kbd>Enter</kbd><span>Expand / collapse</span>
+          <kbd>x</kbd><span>Toggle selection</span>
+          <kbd>s</kbd><span>Save focused article</span>
+          <kbd>d</kbd><span>Delete focused article</span>
+          <kbd>Esc</kbd><span>Close expanded / modal</span>
+          <kbd>?</kbd><span>Toggle this help</span>
+        </div>
+        <button class="btn btn-primary btn-sm" (click)="showHelp.set(false)">Close</button>
+      </div>
+    </div>
+  }
 
   @if (error()) {
     <div class="alert alert-error">{{ error() }}</div>
@@ -30,59 +52,112 @@
         <span class="stat-value stat-low">{{ lowCount() }}</span>
         <span class="stat-label">Low</span>
       </div>
-      <div class="stat-card stat-card-wide">
-        <span class="stat-value stat-sources">{{ topSources() }}</span>
-        <span class="stat-label">Top Sources</span>
-      </div>
-    </section>
-
-    <!-- Top 10 tags histogram -->
-    <section class="chart-section">
-      <div class="chart-header">
-        <h2>Top Tags</h2>
-        <button class="btn btn-primary btn-sm" (click)="generateSummary()" [disabled]="summaryLoading()">
-          {{ summaryLoading() ? 'Generating...' : 'Generate Summary' }}
-        </button>
-      </div>
-      <div class="histogram">
-        @for (tag of topTags(); track tag.name) {
-          <div class="histogram-row">
-            <span class="histogram-label">{{ tag.name }}</span>
-            <div class="histogram-bar-container">
-              <div
-                class="histogram-bar"
-                [style.width.%]="(tag.count / maxTagCount()) * 100"
-              ></div>
-            </div>
-            <span class="histogram-count">{{ tag.count }}</span>
-          </div>
-        }
+      <div class="stat-card">
+        <span class="stat-value stat-tags">{{ tagCounts().length }}</span>
+        <span class="stat-label">Tags</span>
       </div>
     </section>
 
     <!-- AI Summary -->
+    <section class="summary-actions">
+      <span class="summary-label">AI Summary:</span>
+      <button class="btn btn-primary btn-sm" (click)="generateSummary('today')" [disabled]="summaryLoading()">
+        Today
+      </button>
+      <button class="btn btn-primary btn-sm" (click)="generateSummary('week')" [disabled]="summaryLoading()">
+        This week
+      </button>
+      <button class="btn btn-primary btn-sm" (click)="generateSummary('month')" [disabled]="summaryLoading()">
+        This month
+      </button>
+      <button class="btn btn-sm" (click)="generateSummary()" [disabled]="summaryLoading()" style="border: 1px solid #e2e8f0;">
+        All
+      </button>
+      @if (summaryLoading()) {
+        <span class="summary-loading">Generating...</span>
+      }
+    </section>
+
     @if (summaryHtml()) {
       <section class="summary-section" [innerHTML]="summaryHtml()"></section>
     }
 
-    <!-- Tag filter chips -->
-    <section class="tag-filter-section">
-      <span class="tag-filter-label">Filter by tags:</span>
-      <div class="tag-chips">
-        @for (tag of visibleTags(); track tag.name) {
-          <button
-            class="tag-chip"
-            [class.active]="isTagSelected(tag.name)"
-            (click)="toggleTag(tag.name)"
-          >{{ tag.name }} ({{ tag.count }})</button>
-        }
-        @if (hiddenTagCount() > 0) {
-          <button class="tag-chip tag-chip-more" (click)="toggleShowAllTags()">
-            {{ showAllTags() ? 'Show less' : '+' + hiddenTagCount() + ' more' }}
-          </button>
-        }
-        @if (selectedTags().size > 0) {
-          <button class="tag-chip tag-chip-clear" (click)="clearTagFilter()">Clear</button>
+    <!-- Charts row -->
+    <div class="charts-row">
+      <!-- Top 10 tags histogram -->
+      <section class="chart-section">
+        <div class="chart-header">
+          <h2>Top Tags</h2>
+        </div>
+        <div class="histogram">
+          @for (tag of topTags(); track tag.name) {
+            <div class="histogram-row">
+              <span class="histogram-label" [title]="tag.name">{{ tag.name }}</span>
+              <div class="histogram-bar-container">
+                <div
+                  class="histogram-bar"
+                  [style.width.%]="(tag.count / maxTagCount()) * 100"
+                ></div>
+              </div>
+              <span class="histogram-count">{{ tag.count }}</span>
+            </div>
+          }
+        </div>
+      </section>
+
+      <!-- Top 5 sources histogram -->
+      <section class="chart-section">
+        <div class="chart-header">
+          <h2>Top Sources</h2>
+        </div>
+        <div class="histogram">
+          @for (source of topSourcesList(); track source.name) {
+            <div class="histogram-row">
+              <span class="histogram-label" [title]="source.name">{{ source.name }}</span>
+              <div class="histogram-bar-container">
+                <div
+                  class="histogram-bar histogram-bar-source"
+                  [style.width.%]="(source.count / maxSourceCount()) * 100"
+                ></div>
+              </div>
+              <span class="histogram-count">{{ source.count }}</span>
+            </div>
+          }
+        </div>
+      </section>
+    </div>
+
+    <!-- Temporal histogram -->
+    <section class="chart-section">
+      <div class="chart-header">
+        <h2>
+          Timeline
+          @if (timeFilter()) {
+            <button class="btn-clear-time" (click)="clearTimeFilter()">Clear filter</button>
+          }
+        </h2>
+        <div class="granularity-tabs">
+          <button class="granularity-tab" [class.active]="timeGranularity() === 'day'" (click)="timeGranularity.set('day')">Day</button>
+          <button class="granularity-tab" [class.active]="timeGranularity() === 'week'" (click)="timeGranularity.set('week')">Week</button>
+          <button class="granularity-tab" [class.active]="timeGranularity() === 'month'" (click)="timeGranularity.set('month')">Month</button>
+          <button class="granularity-tab" [class.active]="timeGranularity() === 'year'" (click)="timeGranularity.set('year')">Year</button>
+        </div>
+      </div>
+      <div class="timeline-chart">
+        @for (bucket of timeBuckets(); track bucket.label) {
+          <div
+            class="timeline-bar-wrapper"
+            [class.timeline-bar-active]="isTimeBucketActive(bucket)"
+            (click)="toggleTimeBucket(bucket)"
+            [title]="bucket.label + ': ' + bucket.count + ' articles'"
+          >
+            <div
+              class="timeline-bar"
+              [style.height.%]="(bucket.count / maxBucketCount()) * 100"
+            ></div>
+            <span class="timeline-label">{{ bucket.label }}</span>
+            <span class="timeline-count">{{ bucket.count }}</span>
+          </div>
         }
       </div>
     </section>
@@ -123,8 +198,56 @@
             [ngModel]="searchQuery()"
             (ngModelChange)="searchQuery.set($event)"
           />
+
+          <button
+            class="btn-toggle-filters"
+            [class.active]="showAdvancedFilters() || hasActiveAdvancedFilters()"
+            (click)="showAdvancedFilters.update(v => !v)"
+            title="More filters"
+          >
+            {{ showAdvancedFilters() ? 'Less filters' : 'More filters' }}
+            @if (hasActiveAdvancedFilters() && !showAdvancedFilters()) {
+              <span class="filter-badge"></span>
+            }
+          </button>
         </div>
       </div>
+
+      <!-- Advanced filters panel -->
+      @if (showAdvancedFilters()) {
+        <div class="advanced-filters">
+          <div class="advanced-filter-row">
+            <label class="advanced-filter-label">Scraper:</label>
+            <select class="filter-select" [ngModel]="scraperSourceFilter()" (ngModelChange)="scraperSourceFilter.set($event)">
+              <option value="all">All Scrapers</option>
+              @for (src of uniqueScraperSources(); track src) {
+                <option [value]="src">{{ src }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="advanced-filter-row advanced-filter-tags">
+            <label class="advanced-filter-label">Tags:</label>
+            <div class="tag-chips">
+              @for (tag of visibleTags(); track tag.name) {
+                <button
+                  class="tag-chip"
+                  [class.active]="isTagSelected(tag.name)"
+                  (click)="toggleTag(tag.name)"
+                >{{ tag.name }} ({{ tag.count }})</button>
+              }
+              @if (hiddenTagCount() > 0) {
+                <button class="tag-chip tag-chip-more" (click)="toggleShowAllTags()">
+                  {{ showAllTags() ? 'Show less' : '+' + hiddenTagCount() + ' more' }}
+                </button>
+              }
+              @if (selectedTags().size > 0) {
+                <button class="tag-chip tag-chip-clear" (click)="clearTagFilter()">Clear</button>
+              }
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Bulk action bar -->
       @if (selectedCount() > 0) {
@@ -157,20 +280,21 @@
               />
             </th>
             <th class="col-expand"></th>
-            <th>Title</th>
-            <th>Source</th>
-            <th>Tags</th>
-            <th class="sortable" (click)="toggleSort('publishedAt')">
+            <th class="sortable col-published" (click)="toggleSort('publishedAt')">
               Published{{ sortIcon('publishedAt') }}
             </th>
+            <th>Title</th>
+            <th>Tags</th>
             <th class="col-actions"></th>
           </tr>
         </thead>
         <tbody>
-          @for (article of filteredArticles(); track article.id) {
+          @for (article of filteredArticles(); track article.id; let i = $index) {
             <tr [class]="'row-importance-' + article.importance"
                 [class.row-selected]="isSelected(article.id)"
-                [class.row-deleting]="isBusy(article.id)">
+                [class.row-focused]="focusedIndex() === i"
+                [class.row-deleting]="isBusy(article.id)"
+                [attr.data-row-index]="i">
               <td class="col-check">
                 <input
                   type="checkbox"
@@ -183,7 +307,8 @@
                   {{ expandedId() === article.id ? '\u25BC' : '\u25B6' }}
                 </button>
               </td>
-              <td class="article-title">
+              <td class="col-published">{{ formatDate(article.publishedAt) }}</td>
+              <td class="article-title" [title]="article.title">
                 <a [href]="article.url" target="_blank" rel="noopener">{{ article.title }}</a>
                 @if (article.contentUnavailable) {
                   <span class="badge badge-warning" title="Full content could not be fetched — summary is based on excerpt only">!</span>
@@ -191,14 +316,13 @@
                 @if (article.isSaved) {
                   <span class="badge badge-saved" title="Marked as saved/starred in InoReader">&#9733;</span>
                 }
+                <span class="article-source">{{ article.feedSource }}</span>
               </td>
-              <td class="article-source">{{ article.feedSource }}</td>
               <td class="article-tags">
                 @for (tag of article.tags; track tag) {
                   <span [class]="tagBadgeClass(tag)">{{ tag }}</span>
                 }
               </td>
-              <td>{{ formatDate(article.publishedAt) }}</td>
               <td class="col-actions">
                 <button class="btn-icon btn-icon-success" title="Save" (click)="saveArticle(article)" [disabled]="isBusy(article.id)">
                   {{ isSaving(article.id) ? '...' : '\u2605' }}
@@ -210,7 +334,7 @@
             </tr>
             @if (expandedId() === article.id) {
               <tr class="detail-row">
-                <td colspan="7">
+                <td colspan="6">
                   <div class="detail-content">
                     <div class="detail-summary">
                       <h3>Summary</h3>
@@ -236,6 +360,10 @@
                       <div class="meta-item">
                         <span class="meta-label">Language</span>
                         <span class="meta-value">{{ article.summaryLanguage }}</span>
+                      </div>
+                      <div class="meta-item">
+                        <span class="meta-label">Scraper Source</span>
+                        <span class="meta-value">{{ article.scraperSource || '-' }}</span>
                       </div>
                       <div class="meta-item">
                         <span class="meta-label">Content</span>
