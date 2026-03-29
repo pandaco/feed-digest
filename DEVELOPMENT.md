@@ -46,7 +46,7 @@ Fill in the following variables in `.env`:
   - `NOTION_INBOX_DB_ID`, `NOTION_ALL_DB_ID`, `NOTION_SAVED_DB_ID`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
-- `SCRAPER_SOURCE` (default: `inoreader`)
+- `SCRAPER_SOURCE` (comma-separated: `inoreader` for unread, `inoreader-saved` for starred, e.g. `inoreader,inoreader-saved`)
 - `STORAGE_BACKEND` (`google-sheets` or `notion`, default: `google-sheets`)
 - `SHOW_BROWSER` (set to `true` to show Playwright browser window)
 - `RUN_NOW` (set to `true` to bypass the Paris time window guard)
@@ -73,6 +73,16 @@ npm run scraper
 ```
 
 > **Note**: In `development` mode (`NODE_ENV=development` in your `.env`), the scraper uses **local files** instead of AWS DynamoDB: `session-store.json` for the session and `tag-preferences.json` for learned tag preferences. This allows you to test the entire pipeline without an AWS account.
+
+### Fix publication dates
+
+If existing articles have incorrect `publishedAt` dates (e.g. set to the scraping time instead of the real publication date), you can fix them in bulk:
+
+```bash
+npm run fix-dates
+```
+
+This script fetches each article's source URL, extracts the real publication date from HTML meta tags (`article:published_time`, `datePublished`, JSON-LD, etc.), and updates the storage. Articles where no date can be found are skipped.
 
 ---
 
@@ -126,6 +136,7 @@ Create 3 Notion databases (Inbox, All, Saved) with the following properties:
 | Content Unavailable | Checkbox |
 | LLM Provider | Rich text |
 | Summary Language | Rich text |
+| Scraper Source | Rich text |
 
 ### 4.3 Share the databases
 For each database, click **"..."** > **"Connections"** > add your integration.

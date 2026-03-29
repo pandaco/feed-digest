@@ -18,7 +18,7 @@ libs/adapters/      Concrete implementations
 libs/pipeline/      Pipeline orchestration
 apps/scraper/       CLI entry point (composition root)
 apps/webhook/       AWS Lambda handler for Telegram callbacks + REST API
-apps/dashboard/     Angular web UI: inbox browser, saved articles, tag preferences
+apps/dashboard/     Angular web UI: inbox, triage, saved articles, tag preferences
 ```
 
 ## Local setup
@@ -37,6 +37,9 @@ npm run scraper
 
 # Run the webhook server (Telegram polling mode)
 npm run webhook
+
+# Fix publication dates (re-fetch real dates from source URLs)
+npm run fix-dates
 ```
 
 ## Main environment variables
@@ -54,7 +57,7 @@ npm run webhook
 | `NOTION_SAVED_DB_ID` | Notion Saved database ID (if `notion`) | - |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram bot configuration | - |
 | `SUMMARY_LANG` | Summary and message language (`fr`, `en`) | `fr` |
-| `SCRAPER_SOURCE` | Scraping source | `inoreader` |
+| `SCRAPER_SOURCE` | Scraping sources, comma-separated (`inoreader`, `inoreader-saved`) | `inoreader` |
 | `STORAGE_BACKEND` | Storage backend (`google-sheets` or `notion`) | `google-sheets` |
 | `ARTICLES_LIMIT` | Max articles per run | `150` |
 | `MAX_TAGS` | Max tags per article | `3` |
@@ -66,16 +69,29 @@ npm run webhook
 
 ## Pipeline flow
 
-1. **Scraping**: collects unread articles from InoReader (FIFO, max 150)
-2. **Enrichment**: summary, tags, and importance via LLM (sequential, immediate save)
-3. **Storage**: regular articles go to Inbox + All, saved articles go to Saved + All (Google Sheets or Notion depending on `STORAGE_BACKEND`)
-4. **Telegram notification** (4+1 messages):
+1. **Scraping**: collects articles from InoReader — unread (`inoreader`) or starred (`inoreader-saved`) depending on `SCRAPER_SOURCE` (FIFO, max 150)
+2. **Content fetching**: fetches each article's source page, extracts full text via Readability and the real publication date from HTML meta tags / JSON-LD
+3. **Enrichment**: summary and tags via LLM. Importance is **not** determined by the LLM — it is computed from your tag preferences:
+   - Tag with `auto` override or high selection score → **high**
+   - All tags `filtered` → **low**
+   - Otherwise → **medium**
+4. **Storage**: all articles go to Inbox + All (Google Sheets or Notion depending on `STORAGE_BACKEND`). For `inoreader-saved`, processed articles are unstarred on InoReader.
+5. **Telegram notification** (4+1 messages):
    - Run summary (stats, duration)
    - Statistics by RSS source
    - AI synthesis of trends
    - Interactive tag selection (inline buttons, with learned favorites pre-checked; filtered tags are hidden)
    - List of saved articles (if applicable)
-5. **Filtering**: user selects tags to keep via Telegram
-6. **Preference learning**: tag selections are recorded to auto-select favorites in future runs. Tags can also be manually overridden to `auto` (always pre-selected) or `filtered` (hidden from notifications) via the dashboard.
+6. **Filtering**: user selects tags to keep via Telegram
+7. **Preference learning**: tag selections are recorded to auto-select favorites in future runs. Tags can also be manually overridden to `auto` (always pre-selected) or `filtered` (hidden from notifications) via the dashboard.
+
+## Dashboard
+
+The Angular dashboard (`apps/dashboard`) provides four views:
+
+- **Inbox**: browse, filter, and bulk-manage articles. Includes temporal histogram (day/week/month/year), top tags and sources charts, AI summary generation with period options, advanced filters (scraper source, tags), and keyboard shortcuts (`?` to list them).
+- **Triage**: single-article-at-a-time quick processing — Save, Pass, or Skip with keyboard shortcuts.
+- **Saved**: browse and manage saved articles with the same filtering capabilities.
+- **Tag Preferences**: view and override tag auto-selection behavior.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for the full development guide.
