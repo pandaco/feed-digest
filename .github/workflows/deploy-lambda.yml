@@ -1,5 +1,8 @@
 name: Deploy Lambda Webhook
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     branches: [main]
@@ -16,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
@@ -25,8 +28,8 @@ jobs:
       - name: Build webhook
         run: npx nx build webhook
 
-      - name: Install oss-serverless
-        run: npm install -g osls
+      - name: Install serverless
+        run: npm install -g serverless
 
       - name: Deploy to AWS
         working-directory: apps/webhook

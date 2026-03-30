@@ -1,5 +1,8 @@
 name: InoReader Scraper
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   schedule:
     - cron: '0 6 * * *'    # 07:00 Paris winter (UTC+1)
@@ -17,48 +20,72 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    environment: prod
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
 
-      - name: Restore InoReader session
+      - name: Restore local data (session + tag preferences)
         uses: actions/cache@v4
         with:
-          path: session.json
-          key: inoreader-session-${{ github.run_id }}
+          path: |
+            session.json
+            tag-preferences.json
+          key: scraper-data-${{ github.run_id }}
           restore-keys: |
-            inoreader-session-
+            scraper-data-
 
       - name: Install dependencies
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Build scraper
+        run: npx nx build scraper
 
       - name: Run scraper
-        run: npx nx serve scraper
+        run: node dist/apps/scraper/main.js
         env:
-          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
-          SUMMARY_LANG: ${{ secrets.SUMMARY_LANG }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # --- Secrets ---
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
           INOREADER_EMAIL: ${{ secrets.INOREADER_EMAIL }}
           INOREADER_PASSWORD: ${{ secrets.INOREADER_PASSWORD }}
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_INBOX_DB_ID: ${{ secrets.NOTION_INBOX_DB_ID }}
+          NOTION_ALL_DB_ID: ${{ secrets.NOTION_ALL_DB_ID }}
+          NOTION_SAVED_DB_ID: ${{ secrets.NOTION_SAVED_DB_ID }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          DYNAMODB_TABLE_NAME: ${{ secrets.DYNAMODB_TABLE_NAME }}
-          AWS_REGION: eu-west-1
+          TELEGRAM_SECRET_TOKEN: ${{ secrets.TELEGRAM_SECRET_TOKEN }}
+          # --- Variables ---
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          SUMMARY_LANG: ${{ vars.SUMMARY_LANG }}
+          ARTICLES_LIMIT: ${{ vars.ARTICLES_LIMIT }}
+          MAX_TAGS: ${{ vars.MAX_TAGS }}
+          PIPELINE_CONCURRENCY: ${{ vars.PIPELINE_CONCURRENCY }}
+          PIPELINE_MIN_DELAY_MS: ${{ vars.PIPELINE_MIN_DELAY_MS }}
+          PIPELINE_MAX_DELAY_MS: ${{ vars.PIPELINE_MAX_DELAY_MS }}
+          SCRAPER_SOURCE: ${{ vars.SCRAPER_SOURCE }}
+          SHOW_BROWSER: ${{ vars.SHOW_BROWSER }}
+          STORAGE_BACKEND: ${{ vars.STORAGE_BACKEND }}
+          TAG_PREFERENCE_THRESHOLD: ${{ vars.TAG_PREFERENCE_THRESHOLD }}
+          TAG_PREFERENCE_MIN_RUNS: ${{ vars.TAG_PREFERENCE_MIN_RUNS }}
+          # --- Static ---
+          NODE_ENV: development
           RUN_NOW: ${{ inputs.run_now || 'false' }}
 
-      - name: Save InoReader session
+      - name: Save local data (session + tag preferences)
         if: always()
         uses: actions/cache@v4
         with:
-          path: session.json
-          key: inoreader-session-${{ github.run_id }}
+          path: |
+            session.json
+            tag-preferences.json
+          key: scraper-data-${{ github.run_id }}
