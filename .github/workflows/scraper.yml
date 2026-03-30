@@ -40,7 +40,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Run scraper
-        run: npx nx serve scraper
+        run: npm run scraper
         env:
           LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
           SUMMARY_LANG: ${{ secrets.SUMMARY_LANG }}

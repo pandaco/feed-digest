@@ -25,8 +25,8 @@ jobs:
       - name: Build webhook
         run: npx nx build webhook
 
-      - name: Install oss-serverless
-        run: npm install -g osls
+      - name: Install serverless
+        run: npm install -g serverless
 
       - name: Deploy to AWS
         working-directory: apps/webhook
