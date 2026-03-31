@@ -6,26 +6,18 @@ import { InboxService, Article } from '../../services/inbox.service';
 import { TagPreferenceService } from '../../services/tag-preference.service';
 import { AuthService } from '../../services/auth.service';
 import { formatDate } from '../../shared/format';
+import {
+  ImportanceFilter, SortField, SortDirection, COLLAPSED_TAG_LIMIT,
+  applyStructuralFilters, searchAndSort, countByField, countTags,
+} from '../../shared/article-list.utils';
 
-type ImportanceFilter = 'all' | 'high' | 'medium' | 'low';
-type SortField = 'publishedAt' | 'runAt' | 'importance';
-type SortDirection = 'asc' | 'desc';
 type TimeGranularity = 'day' | 'week' | 'month' | 'year';
-
-interface TagWithCount {
-  name: string;
-  count: number;
-}
-
-const IMPORTANCE_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
 const IMPORTANCE_TOOLTIP: Record<string, string> = {
   high: 'High importance: breaking news, major announcements, or critical industry changes that require immediate attention',
   medium: 'Medium importance: notable developments, significant updates, or interesting analyses worth reading',
   low: 'Low importance: general news, minor updates, or niche topics with limited broader impact',
 };
-
-const COLLAPSED_TAG_LIMIT = 8;
 
 @Component({
   selector: 'app-inbox',
@@ -77,15 +69,7 @@ export class InboxComponent {
   mediumCount = computed(() => this.articles().filter(a => a.importance === 'medium').length);
   lowCount = computed(() => this.articles().filter(a => a.importance === 'low').length);
 
-  sourceCountsList = computed(() => {
-    const counts: Record<string, number> = {};
-    for (const a of this.articles()) {
-      counts[a.feedSource] = (counts[a.feedSource] || 0) + 1;
-    }
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  });
+  sourceCountsList = computed(() => countByField(this.articles(), a => a.feedSource));
 
   uniqueScraperSources = computed(() =>
     [...new Set(this.articles().map(a => a.scraperSource).filter(Boolean))].sort()
@@ -95,17 +79,7 @@ export class InboxComponent {
     this.scraperSourceFilter() !== 'all' || this.selectedTags().size > 0
   );
 
-  tagCounts = computed<TagWithCount[]>(() => {
-    const counts: Record<string, number> = {};
-    for (const a of this.articles()) {
-      for (const tag of a.tags) {
-        counts[tag] = (counts[tag] || 0) + 1;
-      }
-    }
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  });
+  tagCounts = computed(() => countTags(this.articles()));
 
   visibleTags = computed(() => {
     const all = this.tagCounts();
@@ -132,15 +106,23 @@ export class InboxComponent {
     return s.length > 0 ? s[0].count : 1;
   });
 
+  // Parsed dates cache — avoids re-parsing when only granularity changes
+  private articleDates = computed(() => {
+    const map = new Map<string, Date>();
+    for (const a of this.articles()) {
+      const d = new Date(a.publishedAt);
+      if (!isNaN(d.getTime())) map.set(a.id, d);
+    }
+    return map;
+  });
+
   // Temporal histogram
   timeBuckets = computed(() => {
-    const articles = this.articles();
+    const dates = this.articleDates();
     const granularity = this.timeGranularity();
     const buckets: Record<string, { label: string; count: number; start: string; end: string }> = {};
 
-    for (const a of articles) {
-      const d = new Date(a.publishedAt);
-      if (isNaN(d.getTime())) continue;
+    for (const [, d] of dates) {
 
       let key: string;
       let label: string;
@@ -187,53 +169,21 @@ export class InboxComponent {
     return b.length > 0 ? Math.max(...b.map(x => x.count)) : 1;
   });
 
-  filteredArticles = computed(() => {
-    let result = this.articles();
+  // Structural filters — only recalculates when filter toggles change, not on search keystrokes
+  private structuralFiltered = computed(() =>
+    applyStructuralFilters(this.articles(), {
+      importance: this.importanceFilter(),
+      sources: this.selectedSources(),
+      scraperSource: this.scraperSourceFilter(),
+      tags: this.selectedTags(),
+      timeRange: this.timeFilter(),
+    })
+  );
 
-    const tf = this.timeFilter();
-    if (tf) {
-      result = result.filter(a => a.publishedAt >= tf.start && a.publishedAt < tf.end);
-    }
-
-    const importance = this.importanceFilter();
-    if (importance !== 'all') {
-      result = result.filter(a => a.importance === importance);
-    }
-
-    const sources = this.selectedSources();
-    if (sources.size > 0) {
-      result = result.filter(a => sources.has(a.feedSource));
-    }
-
-    const scraperSource = this.scraperSourceFilter();
-    if (scraperSource !== 'all') {
-      result = result.filter(a => a.scraperSource === scraperSource);
-    }
-
-    const tags = this.selectedTags();
-    if (tags.size > 0) {
-      result = result.filter(a => a.tags.some(t => tags.has(t)));
-    }
-
-    const query = this.searchQuery().toLowerCase().trim();
-    if (query) {
-      result = result.filter(a =>
-        a.title.toLowerCase().includes(query) ||
-        a.summary.toLowerCase().includes(query)
-      );
-    }
-
-    const field = this.sortField();
-    const dir = this.sortDirection() === 'asc' ? 1 : -1;
-    result = [...result].sort((a, b) => {
-      if (field === 'importance') {
-        return ((IMPORTANCE_RANK[a.importance] || 0) - (IMPORTANCE_RANK[b.importance] || 0)) * dir;
-      }
-      return (a[field] < b[field] ? -1 : a[field] > b[field] ? 1 : 0) * dir;
-    });
-
-    return result;
-  });
+  // Search + sort — recalculates on keystroke but skips structural filtering
+  filteredArticles = computed(() =>
+    searchAndSort(this.structuralFiltered(), this.searchQuery(), this.sortField(), this.sortDirection())
+  );
 
   selectedCount = computed(() => this.selectedIds().size);
 

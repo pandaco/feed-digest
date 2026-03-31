@@ -4,19 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { SavedService } from '../../services/saved.service';
 import { Article } from '../../services/inbox.service';
 import { formatDate } from '../../shared/format';
-
-type ImportanceFilter = 'all' | 'high' | 'medium' | 'low';
-type SortField = 'publishedAt' | 'runAt' | 'importance';
-type SortDirection = 'asc' | 'desc';
-
-interface TagWithCount {
-  name: string;
-  count: number;
-}
-
-const IMPORTANCE_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
-
-const COLLAPSED_TAG_LIMIT = 8;
+import {
+  ImportanceFilter, SortField, SortDirection, COLLAPSED_TAG_LIMIT,
+  applyStructuralFilters, searchAndSort, countByField, countTags,
+} from '../../shared/article-list.utils';
 
 @Component({
   selector: 'app-saved',
@@ -52,15 +43,7 @@ export class SavedComponent {
   mediumCount = computed(() => this.articles().filter(a => a.importance === 'medium').length);
   lowCount = computed(() => this.articles().filter(a => a.importance === 'low').length);
 
-  sourceCountsList = computed(() => {
-    const counts: Record<string, number> = {};
-    for (const a of this.articles()) {
-      counts[a.feedSource] = (counts[a.feedSource] || 0) + 1;
-    }
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  });
+  sourceCountsList = computed(() => countByField(this.articles(), a => a.feedSource));
 
   uniqueScraperSources = computed(() =>
     [...new Set(this.articles().map(a => a.scraperSource).filter(Boolean))].sort()
@@ -84,17 +67,7 @@ export class SavedComponent {
     return sc.length > 0 ? sc[0].count : 1;
   });
 
-  tagCounts = computed<TagWithCount[]>(() => {
-    const counts: Record<string, number> = {};
-    for (const a of this.articles()) {
-      for (const tag of a.tags) {
-        counts[tag] = (counts[tag] || 0) + 1;
-      }
-    }
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  });
+  tagCounts = computed(() => countTags(this.articles()));
 
   visibleTags = computed(() => {
     const all = this.tagCounts();
@@ -114,48 +87,20 @@ export class SavedComponent {
     return top.length > 0 ? top[0].count : 1;
   });
 
-  filteredArticles = computed(() => {
-    let result = this.articles();
+  // Structural filters — only recalculates when filter toggles change, not on search keystrokes
+  private structuralFiltered = computed(() =>
+    applyStructuralFilters(this.articles(), {
+      importance: this.importanceFilter(),
+      sources: this.selectedSources(),
+      scraperSource: this.scraperSourceFilter(),
+      tags: this.selectedTags(),
+    })
+  );
 
-    const importance = this.importanceFilter();
-    if (importance !== 'all') {
-      result = result.filter(a => a.importance === importance);
-    }
-
-    const sources = this.selectedSources();
-    if (sources.size > 0) {
-      result = result.filter(a => sources.has(a.feedSource));
-    }
-
-    const scraperSource = this.scraperSourceFilter();
-    if (scraperSource !== 'all') {
-      result = result.filter(a => a.scraperSource === scraperSource);
-    }
-
-    const tags = this.selectedTags();
-    if (tags.size > 0) {
-      result = result.filter(a => a.tags.some(t => tags.has(t)));
-    }
-
-    const query = this.searchQuery().toLowerCase().trim();
-    if (query) {
-      result = result.filter(a =>
-        a.title.toLowerCase().includes(query) ||
-        a.summary.toLowerCase().includes(query)
-      );
-    }
-
-    const field = this.sortField();
-    const dir = this.sortDirection() === 'asc' ? 1 : -1;
-    result = [...result].sort((a, b) => {
-      if (field === 'importance') {
-        return ((IMPORTANCE_RANK[a.importance] || 0) - (IMPORTANCE_RANK[b.importance] || 0)) * dir;
-      }
-      return (a[field] < b[field] ? -1 : a[field] > b[field] ? 1 : 0) * dir;
-    });
-
-    return result;
-  });
+  // Search + sort — recalculates on keystroke but skips structural filtering
+  filteredArticles = computed(() =>
+    searchAndSort(this.structuralFiltered(), this.searchQuery(), this.sortField(), this.sortDirection())
+  );
 
   selectedCount = computed(() => this.selectedIds().size);
 
