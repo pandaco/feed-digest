@@ -24,11 +24,11 @@ Audit done on 2026-03-31.
 - [x] 15. No pagination/virtualisation for large datasets
 
 ## Visual
-- [ ] 16. No dark mode (navbar is dark but rest is light-only)
-- [ ] 17. No animated loading skeleton (shimmer)
-- [ ] 18. Importance badges could have icons
-- [ ] 19. Timeline histogram has no hover tooltip
-- [ ] 20. No transition/animation on filter panel show/hide
+- [x] 16. No dark mode (navbar is dark but rest is light-only)
+- [x] 17. No animated loading skeleton (shimmer)
+- [x] 18. Importance badges could have icons
+- [x] 19. Timeline histogram has no hover tooltip
+- [x] 20. No transition/animation on filter panel show/hide
 
 ## Accessibility
 - [ ] 21. Tag filter chips missing `aria-pressed` and `role`
