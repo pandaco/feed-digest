@@ -554,18 +554,24 @@ tbody td {
   background: var(--danger-light);
   color: var(--danger-text);
   border: 1px solid var(--danger-border);
+
+  &::before { content: "\25B2 "; font-size: 0.6rem; }
 }
 
 .badge-medium {
   background: var(--warning-light);
   color: var(--warning-text);
   border: 1px solid var(--warning-border);
+
+  &::before { content: "\25C6 "; font-size: 0.6rem; }
 }
 
 .badge-low {
   background: var(--success-light);
   color: var(--success-text);
   border: 1px solid var(--success-border);
+
+  &::before { content: "\25BC "; font-size: 0.6rem; }
 }
 
 .badge-warning {

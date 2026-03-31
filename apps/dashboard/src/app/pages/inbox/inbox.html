@@ -166,6 +166,7 @@
             (keydown.space)="toggleTimeBucket(bucket); $event.preventDefault()"
             [attr.aria-pressed]="isTimeBucketActive(bucket)"
             [attr.aria-label]="bucket.label + ': ' + bucket.count + ' articles'"
+            [title]="bucket.label + ': ' + bucket.count + ' article' + (bucket.count !== 1 ? 's' : '')"
           >
             <div
               class="timeline-bar"
