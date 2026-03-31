@@ -209,7 +209,7 @@
       <!-- Source filter chips -->
       @if (sourceCountsList().length > 1) {
         <div class="source-filter-row" role="group" aria-label="Filter by source">
-          <label class="source-filter-label">Sources:</label>
+          <span class="source-filter-label">Sources:</span>
           <div class="source-chips">
             @for (source of sourceCountsList(); track source.name) {
               <button
