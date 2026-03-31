@@ -33,7 +33,7 @@ export class SavedComponent {
 
   searchQuery = signal('');
   importanceFilter = signal<ImportanceFilter>('all');
-  sourceFilter = signal('all');
+  selectedSources = signal<Set<string>>(new Set());
   scraperSourceFilter = signal('all');
   selectedTags = signal<Set<string>>(new Set());
   sortField = signal<SortField>('publishedAt');
@@ -50,9 +50,15 @@ export class SavedComponent {
   mediumCount = computed(() => this.articles().filter(a => a.importance === 'medium').length);
   lowCount = computed(() => this.articles().filter(a => a.importance === 'low').length);
 
-  uniqueSources = computed(() =>
-    [...new Set(this.articles().map(a => a.feedSource))].sort()
-  );
+  sourceCountsList = computed(() => {
+    const counts: Record<string, number> = {};
+    for (const a of this.articles()) {
+      counts[a.feedSource] = (counts[a.feedSource] || 0) + 1;
+    }
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  });
 
   uniqueScraperSources = computed(() =>
     [...new Set(this.articles().map(a => a.scraperSource).filter(Boolean))].sort()
@@ -62,16 +68,7 @@ export class SavedComponent {
     this.scraperSourceFilter() !== 'all' || this.selectedTags().size > 0
   );
 
-  sourceCounts = computed(() => {
-    const counts: Record<string, number> = {};
-    for (const a of this.articles()) {
-      counts[a.feedSource] = (counts[a.feedSource] || 0) + 1;
-    }
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name, count]) => ({ name, count }));
-  });
+  sourceCounts = computed(() => this.sourceCountsList().slice(0, 5));
 
   topSources = computed(() =>
     this.sourceCounts()
@@ -123,9 +120,9 @@ export class SavedComponent {
       result = result.filter(a => a.importance === importance);
     }
 
-    const source = this.sourceFilter();
-    if (source !== 'all') {
-      result = result.filter(a => a.feedSource === source);
+    const sources = this.selectedSources();
+    if (sources.size > 0) {
+      result = result.filter(a => sources.has(a.feedSource));
     }
 
     const scraperSource = this.scraperSourceFilter();
@@ -166,6 +163,26 @@ export class SavedComponent {
     const sel = this.selectedIds();
     return visible.every(a => sel.has(a.id));
   });
+
+  // Source filter
+  isSourceSelected(source: string): boolean {
+    return this.selectedSources().has(source);
+  }
+
+  toggleSource(source: string): void {
+    this.selectedSources.update(set => {
+      const next = new Set(set);
+      if (next.has(source)) next.delete(source);
+      else next.add(source);
+      return next;
+    });
+    this.selectedIds.set(new Set());
+  }
+
+  clearSourceFilter(): void {
+    this.selectedSources.set(new Set());
+    this.selectedIds.set(new Set());
+  }
 
   // Tag filter
   isTagSelected(tag: string): boolean {

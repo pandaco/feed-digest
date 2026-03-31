@@ -100,13 +100,6 @@
         </div>
 
         <div class="table-actions">
-          <select class="filter-select" [ngModel]="sourceFilter()" (ngModelChange)="sourceFilter.set($event)">
-            <option value="all">All Sources</option>
-            @for (source of uniqueSources(); track source) {
-              <option [value]="source">{{ source }}</option>
-            }
-          </select>
-
           <input
             class="search-input"
             type="text"
@@ -128,6 +121,26 @@
           </button>
         </div>
       </div>
+
+      <!-- Source filter chips -->
+      @if (sourceCountsList().length > 1) {
+        <div class="source-filter-row" role="group" aria-label="Filter by source">
+          <label class="source-filter-label">Sources:</label>
+          <div class="source-chips">
+            @for (source of sourceCountsList(); track source.name) {
+              <button
+                class="source-chip"
+                [class.active]="isSourceSelected(source.name)"
+                (click)="toggleSource(source.name)"
+                [attr.aria-pressed]="isSourceSelected(source.name)"
+              >{{ source.name }} <span class="source-chip-count">({{ source.count }})</span></button>
+            }
+            @if (selectedSources().size > 0) {
+              <button class="source-chip source-chip-clear" (click)="clearSourceFilter()" aria-label="Clear source filter">Clear</button>
+            }
+          </div>
+        </div>
+      }
 
       <!-- Advanced filters panel -->
       @if (showAdvancedFilters()) {
