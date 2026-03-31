@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, DestroyRef } from '@angular/core';
+import { Component, inject, signal, computed, effect, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { TagPreferenceService, TagPreferenceResponse, TagOverride } from '../../services/tag-preference.service';
@@ -28,6 +28,17 @@ export class TagPreferencesComponent {
   private service = inject(TagPreferenceService);
   private auth = inject(AuthService);
   private destroyRef = inject(DestroyRef);
+  private errorTimer?: ReturnType<typeof setTimeout>;
+
+  constructor() {
+    effect(() => {
+      const err = this.error();
+      clearTimeout(this.errorTimer);
+      if (err) {
+        this.errorTimer = setTimeout(() => this.error.set(null), 8000);
+      }
+    });
+  }
 
   loading = signal(false);
   error = signal<string | null>(null);

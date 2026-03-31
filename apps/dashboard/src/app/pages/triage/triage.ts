@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, DestroyRef, HostListener } from '@angular/core';
+import { Component, inject, signal, computed, effect, DestroyRef, HostListener } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { InboxService, Article } from '../../services/inbox.service';
@@ -15,6 +15,17 @@ export class TriageComponent {
   private service = inject(InboxService);
   private auth = inject(AuthService);
   private destroyRef = inject(DestroyRef);
+  private errorTimer?: ReturnType<typeof setTimeout>;
+
+  constructor() {
+    effect(() => {
+      const err = this.error();
+      clearTimeout(this.errorTimer);
+      if (err) {
+        this.errorTimer = setTimeout(() => this.error.set(null), 8000);
+      }
+    });
+  }
 
   loading = signal(false);
   saving = signal(false);
