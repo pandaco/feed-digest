@@ -1,11 +1,11 @@
-import { Component, inject, signal, computed, DestroyRef } from '@angular/core';
+import { Component, inject, signal, computed, effect, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { SavedService } from '../../services/saved.service';
 import { Article } from '../../services/inbox.service';
 import { formatDate } from '../../shared/format';
 import {
-  ImportanceFilter, SortField, SortDirection, COLLAPSED_TAG_LIMIT,
+  ImportanceFilter, SortField, SortDirection, COLLAPSED_TAG_LIMIT, PAGE_SIZE,
   applyStructuralFilters, searchAndSort, countByField, countTags,
 } from '../../shared/article-list.utils';
 
@@ -18,6 +18,22 @@ import {
 export class SavedComponent {
   private service = inject(SavedService);
   private destroyRef = inject(DestroyRef);
+  private errorTimer?: ReturnType<typeof setTimeout>;
+
+  constructor() {
+    effect(() => {
+      const err = this.error();
+      clearTimeout(this.errorTimer);
+      if (err) {
+        this.errorTimer = setTimeout(() => this.error.set(null), 8000);
+      }
+    });
+
+    effect(() => {
+      this.filteredArticles();
+      this.currentPage.set(1);
+    }, { allowSignalWrites: true });
+  }
 
   loading = signal(false);
   deleting = signal(false);
@@ -36,6 +52,7 @@ export class SavedComponent {
   deletingIds = signal<Set<string>>(new Set());
   showAllTags = signal(false);
   showAdvancedFilters = signal(false);
+  currentPage = signal(1);
 
   // Stats
   totalCount = computed(() => this.articles().length);
@@ -102,10 +119,18 @@ export class SavedComponent {
     searchAndSort(this.structuralFiltered(), this.searchQuery(), this.sortField(), this.sortDirection())
   );
 
+  totalPages = computed(() => Math.max(1, Math.ceil(this.filteredArticles().length / PAGE_SIZE)));
+
+  paginatedArticles = computed(() => {
+    const page = Math.min(this.currentPage(), this.totalPages());
+    const start = (page - 1) * PAGE_SIZE;
+    return this.filteredArticles().slice(start, start + PAGE_SIZE);
+  });
+
   selectedCount = computed(() => this.selectedIds().size);
 
   allVisibleSelected = computed(() => {
-    const visible = this.filteredArticles();
+    const visible = this.paginatedArticles();
     if (visible.length === 0) return false;
     const sel = this.selectedIds();
     return visible.every(a => sel.has(a.id));
@@ -177,7 +202,7 @@ export class SavedComponent {
     if (this.allVisibleSelected()) {
       this.selectedIds.set(new Set());
     } else {
-      this.selectedIds.set(new Set(this.filteredArticles().map(a => a.id)));
+      this.selectedIds.set(new Set(this.paginatedArticles().map(a => a.id)));
     }
   }
 

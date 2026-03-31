@@ -12,6 +12,7 @@ export interface TagWithCount {
 export const IMPORTANCE_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
 export const COLLAPSED_TAG_LIMIT = 8;
+export const PAGE_SIZE = 50;
 
 export interface StructuralFilters {
   importance: ImportanceFilter;

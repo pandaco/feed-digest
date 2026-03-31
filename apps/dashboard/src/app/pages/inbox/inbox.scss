@@ -24,7 +24,9 @@
 }
 
 .search-input {
-  width: 220px;
+  flex: 1 1 220px;
+  min-width: 120px;
+  max-width: 320px;
 }
 
 // Help button
@@ -316,6 +318,8 @@ kbd {
   font-size: 0.9rem;
   line-height: 1.65;
   color: #334155;
+  max-height: 400px;
+  overflow-y: auto;
 
   h3 {
     font-size: 1rem;
@@ -426,6 +430,7 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  animation: slideDown 0.2s ease-out;
 }
 
 .advanced-filter-row {

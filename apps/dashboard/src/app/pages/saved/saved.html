@@ -8,7 +8,17 @@
   </div>
 
   @if (error()) {
-    <div class="alert alert-error">{{ error() }}</div>
+    <div class="alert alert-error" role="alert">{{ error() }}</div>
+  }
+
+  @if (loading() && articles().length === 0) {
+    <div class="skeleton">
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+    </div>
   }
 
   @if (articles().length) {
@@ -84,17 +94,17 @@
     <!-- Table -->
     <section class="table-section">
       <div class="table-header">
-        <div class="filter-tabs">
-          <button class="filter-tab" [class.active]="importanceFilter() === 'all'" (click)="importanceFilter.set('all')">
+        <div class="filter-tabs" role="tablist" aria-label="Filter by importance">
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'all'" [class.active]="importanceFilter() === 'all'" (click)="importanceFilter.set('all')">
             All ({{ totalCount() }})
           </button>
-          <button class="filter-tab" [class.active]="importanceFilter() === 'high'" (click)="importanceFilter.set('high')">
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'high'" [class.active]="importanceFilter() === 'high'" (click)="importanceFilter.set('high')">
             High ({{ highCount() }})
           </button>
-          <button class="filter-tab" [class.active]="importanceFilter() === 'medium'" (click)="importanceFilter.set('medium')">
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'medium'" [class.active]="importanceFilter() === 'medium'" (click)="importanceFilter.set('medium')">
             Medium ({{ mediumCount() }})
           </button>
-          <button class="filter-tab" [class.active]="importanceFilter() === 'low'" (click)="importanceFilter.set('low')">
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'low'" [class.active]="importanceFilter() === 'low'" (click)="importanceFilter.set('low')">
             Low ({{ lowCount() }})
           </button>
         </div>
@@ -157,12 +167,13 @@
 
           <div class="advanced-filter-row advanced-filter-tags">
             <label class="advanced-filter-label">Tags:</label>
-            <div class="tag-chips">
+            <div class="tag-chips" role="group" aria-label="Filter by tag">
               @for (tag of visibleTags(); track tag.name) {
                 <button
                   class="tag-chip"
                   [class.active]="isTagSelected(tag.name)"
                   (click)="toggleTag(tag.name)"
+                  [attr.aria-pressed]="isTagSelected(tag.name)"
                 >{{ tag.name }} ({{ tag.count }})</button>
               }
               @if (hiddenTagCount() > 0) {
@@ -213,7 +224,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (article of filteredArticles(); track article.id) {
+          @for (article of paginatedArticles(); track article.id) {
             <tr [class]="'row-importance-' + article.importance"
                 [class.row-selected]="isSelected(article.id)"
                 [class.row-deleting]="isDeleting(article.id)">
@@ -300,6 +311,16 @@
 
       @if (filteredArticles().length === 0) {
         <div class="empty-state">No articles match your filters.</div>
+      }
+
+      @if (totalPages() > 1) {
+        <div class="pagination">
+          <button class="pagination-btn" [disabled]="currentPage() === 1" (click)="currentPage.set(1)" title="First page">&laquo;</button>
+          <button class="pagination-btn" [disabled]="currentPage() === 1" (click)="currentPage.update(p => p - 1)" title="Previous page">&lsaquo;</button>
+          <span class="pagination-info">Page {{ currentPage() }} / {{ totalPages() }}</span>
+          <button class="pagination-btn" [disabled]="currentPage() === totalPages()" (click)="currentPage.update(p => p + 1)" title="Next page">&rsaquo;</button>
+          <button class="pagination-btn" [disabled]="currentPage() === totalPages()" (click)="currentPage.set(totalPages())" title="Last page">&raquo;</button>
+        </div>
       }
     </section>
   }

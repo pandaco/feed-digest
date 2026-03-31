@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, DestroyRef, HostListener, SecurityContext } from '@angular/core';
+import { Component, inject, signal, computed, effect, DestroyRef, HostListener, SecurityContext } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
@@ -7,7 +7,7 @@ import { TagPreferenceService } from '../../services/tag-preference.service';
 import { AuthService } from '../../services/auth.service';
 import { formatDate } from '../../shared/format';
 import {
-  ImportanceFilter, SortField, SortDirection, COLLAPSED_TAG_LIMIT,
+  ImportanceFilter, SortField, SortDirection, COLLAPSED_TAG_LIMIT, PAGE_SIZE,
   applyStructuralFilters, searchAndSort, countByField, countTags,
 } from '../../shared/article-list.utils';
 
@@ -31,6 +31,23 @@ export class InboxComponent {
   private auth = inject(AuthService);
   private sanitizer = inject(DomSanitizer);
   private destroyRef = inject(DestroyRef);
+  private errorTimer?: ReturnType<typeof setTimeout>;
+
+  constructor() {
+    effect(() => {
+      const err = this.error();
+      clearTimeout(this.errorTimer);
+      if (err) {
+        this.errorTimer = setTimeout(() => this.error.set(null), 8000);
+      }
+    });
+
+    // Reset to page 1 whenever filters/search change the result set
+    effect(() => {
+      this.filteredArticles(); // track dependency
+      this.currentPage.set(1);
+    }, { allowSignalWrites: true });
+  }
 
   loading = signal(false);
   deleting = signal(false);
@@ -53,6 +70,7 @@ export class InboxComponent {
   showAdvancedFilters = signal(false);
   showHelp = signal(false);
   focusedIndex = signal(-1);
+  currentPage = signal(1);
   timeGranularity = signal<TimeGranularity>('day');
   timeFilter = signal<{ start: string; end: string } | null>(null);
 
@@ -185,10 +203,18 @@ export class InboxComponent {
     searchAndSort(this.structuralFiltered(), this.searchQuery(), this.sortField(), this.sortDirection())
   );
 
+  totalPages = computed(() => Math.max(1, Math.ceil(this.filteredArticles().length / PAGE_SIZE)));
+
+  paginatedArticles = computed(() => {
+    const page = Math.min(this.currentPage(), this.totalPages());
+    const start = (page - 1) * PAGE_SIZE;
+    return this.filteredArticles().slice(start, start + PAGE_SIZE);
+  });
+
   selectedCount = computed(() => this.selectedIds().size);
 
   allVisibleSelected = computed(() => {
-    const visible = this.filteredArticles();
+    const visible = this.paginatedArticles();
     if (visible.length === 0) return false;
     const sel = this.selectedIds();
     return visible.every(a => sel.has(a.id));
@@ -224,6 +250,25 @@ export class InboxComponent {
     this.selectedSources.set(new Set());
     this.selectedIds.set(new Set());
   }
+
+  resetAllFilters(): void {
+    this.importanceFilter.set('all');
+    this.selectedSources.set(new Set());
+    this.scraperSourceFilter.set('all');
+    this.selectedTags.set(new Set());
+    this.searchQuery.set('');
+    this.timeFilter.set(null);
+    this.selectedIds.set(new Set());
+  }
+
+  hasAnyActiveFilter = computed(() =>
+    this.importanceFilter() !== 'all' ||
+    this.selectedSources().size > 0 ||
+    this.scraperSourceFilter() !== 'all' ||
+    this.selectedTags().size > 0 ||
+    this.searchQuery().trim() !== '' ||
+    this.timeFilter() !== null
+  );
 
   // Tag filter
   isTagSelected(tag: string): boolean {
@@ -279,7 +324,7 @@ export class InboxComponent {
     if (this.allVisibleSelected()) {
       this.selectedIds.set(new Set());
     } else {
-      this.selectedIds.set(new Set(this.filteredArticles().map(a => a.id)));
+      this.selectedIds.set(new Set(this.paginatedArticles().map(a => a.id)));
     }
   }
 
@@ -490,7 +535,7 @@ export class InboxComponent {
     const target = event.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
 
-    const articles = this.filteredArticles();
+    const articles = this.paginatedArticles();
     if (articles.length === 0) return;
 
     switch (event.key) {
@@ -524,6 +569,10 @@ export class InboxComponent {
         break;
       case 'd':
         this.actionFocused(articles, 'delete');
+        event.preventDefault();
+        break;
+      case 'r':
+        this.resetAllFilters();
         event.preventDefault();
         break;
       case 'Escape':

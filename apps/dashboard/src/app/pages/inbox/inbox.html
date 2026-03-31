@@ -11,7 +11,7 @@
 
   <!-- Keyboard shortcuts help -->
   @if (showHelp()) {
-    <div class="help-overlay" (click)="showHelp.set(false)">
+    <div class="help-overlay" (click)="showHelp.set(false)" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
       <div class="help-modal" (click)="$event.stopPropagation()">
         <h2>Keyboard Shortcuts</h2>
         <div class="help-grid">
@@ -21,6 +21,7 @@
           <kbd>x</kbd><span>Toggle selection</span>
           <kbd>s</kbd><span>Save focused article</span>
           <kbd>d</kbd><span>Delete focused article</span>
+          <kbd>r</kbd><span>Reset all filters</span>
           <kbd>Esc</kbd><span>Close expanded / modal</span>
           <kbd>?</kbd><span>Toggle this help</span>
         </div>
@@ -30,7 +31,17 @@
   }
 
   @if (error()) {
-    <div class="alert alert-error">{{ error() }}</div>
+    <div class="alert alert-error" role="alert">{{ error() }}</div>
+  }
+
+  @if (loading() && articles().length === 0) {
+    <div class="skeleton">
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+    </div>
   }
 
   @if (articles().length) {
@@ -143,13 +154,18 @@
           <button class="granularity-tab" [class.active]="timeGranularity() === 'year'" (click)="timeGranularity.set('year')">Year</button>
         </div>
       </div>
-      <div class="timeline-chart">
+      <div class="timeline-chart" role="group" aria-label="Timeline histogram">
         @for (bucket of timeBuckets(); track bucket.label) {
           <div
             class="timeline-bar-wrapper"
+            role="button"
+            tabindex="0"
             [class.timeline-bar-active]="isTimeBucketActive(bucket)"
             (click)="toggleTimeBucket(bucket)"
-            [title]="bucket.label + ': ' + bucket.count + ' articles'"
+            (keydown.enter)="toggleTimeBucket(bucket)"
+            (keydown.space)="toggleTimeBucket(bucket); $event.preventDefault()"
+            [attr.aria-pressed]="isTimeBucketActive(bucket)"
+            [attr.aria-label]="bucket.label + ': ' + bucket.count + ' articles'"
           >
             <div
               class="timeline-bar"
@@ -165,19 +181,19 @@
     <!-- Table -->
     <section class="table-section">
       <div class="table-header">
-        <div class="filter-tabs">
-          <button class="filter-tab" [class.active]="importanceFilter() === 'all'" (click)="importanceFilter.set('all')">
+        <div class="filter-tabs" role="tablist" aria-label="Filter by importance">
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'all'" [class.active]="importanceFilter() === 'all'" (click)="importanceFilter.set('all')">
             All ({{ totalCount() }})
           </button>
-          <button class="filter-tab" [class.active]="importanceFilter() === 'high'" (click)="importanceFilter.set('high')"
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'high'" [class.active]="importanceFilter() === 'high'" (click)="importanceFilter.set('high')"
             [title]="importanceTooltip('high')">
             High ({{ highCount() }})
           </button>
-          <button class="filter-tab" [class.active]="importanceFilter() === 'medium'" (click)="importanceFilter.set('medium')"
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'medium'" [class.active]="importanceFilter() === 'medium'" (click)="importanceFilter.set('medium')"
             [title]="importanceTooltip('medium')">
             Medium ({{ mediumCount() }})
           </button>
-          <button class="filter-tab" [class.active]="importanceFilter() === 'low'" (click)="importanceFilter.set('low')"
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'low'" [class.active]="importanceFilter() === 'low'" (click)="importanceFilter.set('low')"
             [title]="importanceTooltip('low')">
             Low ({{ lowCount() }})
           </button>
@@ -203,6 +219,12 @@
               <span class="filter-badge"></span>
             }
           </button>
+
+          @if (hasAnyActiveFilter()) {
+            <button class="btn-reset-filters" (click)="resetAllFilters()" title="Reset all filters (r)">
+              Reset filters
+            </button>
+          }
         </div>
       </div>
 
@@ -241,12 +263,13 @@
 
           <div class="advanced-filter-row advanced-filter-tags">
             <label class="advanced-filter-label">Tags:</label>
-            <div class="tag-chips">
+            <div class="tag-chips" role="group" aria-label="Filter by tag">
               @for (tag of visibleTags(); track tag.name) {
                 <button
                   class="tag-chip"
                   [class.active]="isTagSelected(tag.name)"
                   (click)="toggleTag(tag.name)"
+                  [attr.aria-pressed]="isTagSelected(tag.name)"
                 >{{ tag.name }} ({{ tag.count }})</button>
               }
               @if (hiddenTagCount() > 0) {
@@ -302,7 +325,7 @@
           </tr>
         </thead>
         <tbody>
-          @for (article of filteredArticles(); track article.id; let i = $index) {
+          @for (article of paginatedArticles(); track article.id; let i = $index) {
             <tr [class]="'row-importance-' + article.importance"
                 [class.row-selected]="isSelected(article.id)"
                 [class.row-focused]="focusedIndex() === i"
@@ -401,6 +424,16 @@
 
       @if (filteredArticles().length === 0) {
         <div class="empty-state">No articles match your filters.</div>
+      }
+
+      @if (totalPages() > 1) {
+        <div class="pagination">
+          <button class="pagination-btn" [disabled]="currentPage() === 1" (click)="currentPage.set(1)" title="First page">&laquo;</button>
+          <button class="pagination-btn" [disabled]="currentPage() === 1" (click)="currentPage.update(p => p - 1)" title="Previous page">&lsaquo;</button>
+          <span class="pagination-info">Page {{ currentPage() }} / {{ totalPages() }}</span>
+          <button class="pagination-btn" [disabled]="currentPage() === totalPages()" (click)="currentPage.update(p => p + 1)" title="Next page">&rsaquo;</button>
+          <button class="pagination-btn" [disabled]="currentPage() === totalPages()" (click)="currentPage.set(totalPages())" title="Last page">&raquo;</button>
+        </div>
       }
     </section>
   }
