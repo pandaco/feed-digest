@@ -1,7 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { apiHeaders } from '../shared/api-headers';
 
 export type TagOverride = 'auto' | 'filtered';
 
@@ -21,24 +20,17 @@ export class TagPreferenceService {
   private apiBase = '/api/preferences';
 
   getPreferences(chatId: string): Observable<TagPreferenceResponse> {
-    return this.http.get<TagPreferenceResponse>(
-      `${this.apiBase}/${chatId}`,
-      { headers: apiHeaders() },
-    );
+    return this.http.get<TagPreferenceResponse>(`${this.apiBase}/${chatId}`);
   }
 
   resetPreferences(chatId: string): Observable<{ message: string }> {
-    return this.http.delete<{ message: string }>(
-      `${this.apiBase}/${chatId}`,
-      { headers: apiHeaders() },
-    );
+    return this.http.delete<{ message: string }>(`${this.apiBase}/${chatId}`);
   }
 
   setTagOverride(chatId: string, tag: string, override: TagOverride | null): Observable<{ tag: string; override: TagOverride | null }> {
     return this.http.post<{ tag: string; override: TagOverride | null }>(
       `${this.apiBase}/${chatId}/tags/${encodeURIComponent(tag)}/override`,
       { override },
-      { headers: apiHeaders() },
     );
   }
 }

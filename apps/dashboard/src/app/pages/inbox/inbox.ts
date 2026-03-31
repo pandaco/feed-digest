@@ -1,4 +1,5 @@
-import { Component, inject, signal, computed, HostListener } from '@angular/core';
+import { Component, inject, signal, computed, HostListener, SecurityContext } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { InboxService, Article } from '../../services/inbox.service';
 import { TagPreferenceService } from '../../services/tag-preference.service';
@@ -35,6 +36,7 @@ export class InboxComponent {
   private service = inject(InboxService);
   private prefService = inject(TagPreferenceService);
   private auth = inject(AuthService);
+  private sanitizer = inject(DomSanitizer);
 
   loading = signal(false);
   deleting = signal(false);
@@ -454,7 +456,7 @@ export class InboxComponent {
 
     this.service.generateSummary(period).subscribe({
       next: (res) => {
-        this.summaryHtml.set(res.html);
+        this.summaryHtml.set(this.sanitizer.sanitize(SecurityContext.HTML, res.html) || '');
         this.summaryLoading.set(false);
       },
       error: () => {
