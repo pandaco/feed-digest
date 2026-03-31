@@ -1,4 +1,5 @@
-import { Component, inject, signal, computed, HostListener } from '@angular/core';
+import { Component, inject, signal, computed, DestroyRef, HostListener } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { InboxService, Article } from '../../services/inbox.service';
 import { AuthService } from '../../services/auth.service';
@@ -13,6 +14,7 @@ import { formatDate } from '../../shared/format';
 export class TriageComponent {
   private service = inject(InboxService);
   private auth = inject(AuthService);
+  private destroyRef = inject(DestroyRef);
 
   loading = signal(false);
   saving = signal(false);
@@ -112,7 +114,7 @@ export class TriageComponent {
     this.skippedCount.set(0);
     this.actionedIndices.set(new Set());
 
-    this.service.getInbox().subscribe({
+    this.service.getInbox().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (articles) => {
         this.articles.set(articles);
         this.loading.set(false);
@@ -131,7 +133,7 @@ export class TriageComponent {
     this.saving.set(true);
     this.error.set(null);
 
-    this.service.saveArticles([article.id]).subscribe({
+    this.service.saveArticles([article.id]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.savedCount.update(n => n + 1);
         this.actionedIndices.update(set => new Set(set).add(this.currentIndex()));
@@ -152,7 +154,7 @@ export class TriageComponent {
     this.skipping.set(true);
     this.error.set(null);
 
-    this.service.deleteArticle(article.id).subscribe({
+    this.service.deleteArticle(article.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.skippedCount.update(n => n + 1);
         this.actionedIndices.update(set => new Set(set).add(this.currentIndex()));

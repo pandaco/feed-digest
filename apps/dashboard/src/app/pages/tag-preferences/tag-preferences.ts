@@ -1,4 +1,5 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { TagPreferenceService, TagPreferenceResponse, TagOverride } from '../../services/tag-preference.service';
 import { AuthService } from '../../services/auth.service';
@@ -26,6 +27,7 @@ interface TagRow {
 export class TagPreferencesComponent {
   private service = inject(TagPreferenceService);
   private auth = inject(AuthService);
+  private destroyRef = inject(DestroyRef);
 
   loading = signal(false);
   error = signal<string | null>(null);
@@ -96,7 +98,7 @@ export class TagPreferencesComponent {
     this.loading.set(true);
     this.error.set(null);
 
-    this.service.getPreferences(id).subscribe({
+    this.service.getPreferences(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res) => {
         this.data.set(res);
         this.loading.set(false);
@@ -113,7 +115,7 @@ export class TagPreferencesComponent {
     if (!id || !confirm('Reset all tag preferences? This cannot be undone.')) return;
 
     this.loading.set(true);
-    this.service.resetPreferences(id).subscribe({
+    this.service.resetPreferences(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.data.set(null);
         this.loading.set(false);
@@ -131,7 +133,7 @@ export class TagPreferencesComponent {
 
     const override: TagOverride | null = newState === 'default' ? null : newState as TagOverride;
 
-    this.service.setTagOverride(id, tag.name, override).subscribe({
+    this.service.setTagOverride(id, tag.name, override).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.loadPreferences(),
       error: () => this.error.set(`Failed to update "${tag.name}"`),
     });

@@ -1,4 +1,5 @@
-import { Component, inject, signal, computed, HostListener, SecurityContext } from '@angular/core';
+import { Component, inject, signal, computed, DestroyRef, HostListener, SecurityContext } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { InboxService, Article } from '../../services/inbox.service';
@@ -37,6 +38,7 @@ export class InboxComponent {
   private prefService = inject(TagPreferenceService);
   private auth = inject(AuthService);
   private sanitizer = inject(DomSanitizer);
+  private destroyRef = inject(DestroyRef);
 
   loading = signal(false);
   deleting = signal(false);
@@ -340,7 +342,7 @@ export class InboxComponent {
     this.error.set(null);
     this.deletingIds.set(new Set(ids));
 
-    this.service.bulkDelete(ids).subscribe({
+    this.service.bulkDelete(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         const deletedSet = new Set(ids);
         this.articles.update(list => list.filter(a => !deletedSet.has(a.id)));
@@ -364,7 +366,7 @@ export class InboxComponent {
 
     this.savingIds.update(set => new Set(set).add(article.id));
 
-    this.service.saveArticles([article.id]).subscribe({
+    this.service.saveArticles([article.id]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.articles.update(list => list.filter(a => a.id !== article.id));
         this.selectedIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
@@ -386,7 +388,7 @@ export class InboxComponent {
     this.error.set(null);
     this.savingIds.set(new Set(ids));
 
-    this.service.saveArticles(ids).subscribe({
+    this.service.saveArticles(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         const savedSet = new Set(ids);
         this.articles.update(list => list.filter(a => !savedSet.has(a.id)));
@@ -411,7 +413,7 @@ export class InboxComponent {
     this.selectedIds.set(new Set());
     this.summaryHtml.set('');
 
-    this.service.getInbox().subscribe({
+    this.service.getInbox().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (articles) => {
         this.articles.set(articles);
         this.loading.set(false);
@@ -428,7 +430,7 @@ export class InboxComponent {
     const chatId = this.auth.chatId();
     if (!chatId) return;
 
-    this.prefService.getPreferences(chatId).subscribe({
+    this.prefService.getPreferences(chatId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (prefs) => {
         const threshold = prefs.threshold;
         const minRuns = prefs.minRuns;
@@ -454,7 +456,7 @@ export class InboxComponent {
     this.summaryLoading.set(true);
     this.error.set(null);
 
-    this.service.generateSummary(period).subscribe({
+    this.service.generateSummary(period).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res) => {
         this.summaryHtml.set(this.sanitizer.sanitize(SecurityContext.HTML, res.html) || '');
         this.summaryLoading.set(false);
@@ -472,7 +474,7 @@ export class InboxComponent {
 
     this.deletingIds.update(set => new Set(set).add(article.id));
 
-    this.service.deleteArticle(article.id).subscribe({
+    this.service.deleteArticle(article.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.articles.update(list => list.filter(a => a.id !== article.id));
         this.selectedIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
@@ -610,7 +612,7 @@ export class InboxComponent {
     } else {
       if (this.deletingIds().has(article.id)) return;
       this.deletingIds.update(set => new Set(set).add(article.id));
-      this.service.deleteArticle(article.id).subscribe({
+      this.service.deleteArticle(article.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => {
           this.articles.update(list => list.filter(a => a.id !== article.id));
           this.selectedIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
