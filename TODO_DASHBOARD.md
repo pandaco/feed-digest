@@ -31,8 +31,8 @@ Audit done on 2026-03-31.
 - [x] 20. No transition/animation on filter panel show/hide
 
 ## Accessibility
-- [ ] 21. Tag filter chips missing `aria-pressed` and `role`
-- [ ] 22. Importance tabs missing `role="tablist"`/`role="tab"`
-- [ ] 23. Timeline bars have no ARIA attributes
-- [ ] 24. No focus trap in help modals
-- [ ] 25. `formatDate()` manual — use `Intl.DateTimeFormat` for locale
+- [x] 21. Tag filter chips missing `aria-pressed` and `role`
+- [x] 22. Importance tabs missing `role="tablist"`/`role="tab"`
+- [x] 23. Timeline bars have no ARIA attributes
+- [x] 24. No focus trap in help modals
+- [x] 25. `formatDate()` manual — use `Intl.DateTimeFormat` for locale

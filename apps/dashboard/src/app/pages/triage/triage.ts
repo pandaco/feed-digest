@@ -25,6 +25,12 @@ export class TriageComponent {
         this.errorTimer = setTimeout(() => this.error.set(null), 8000);
       }
     });
+
+    effect(() => {
+      if (this.showHelp()) {
+        setTimeout(() => (document.querySelector('.help-modal button') as HTMLElement)?.focus());
+      }
+    });
   }
 
   loading = signal(false);
@@ -85,6 +91,16 @@ export class TriageComponent {
 
   @HostListener('document:keydown', ['$event'])
   handleKeyDown(event: KeyboardEvent): void {
+    if (this.showHelp()) {
+      if (event.key === 'Escape' || event.key === '?') {
+        this.showHelp.set(false);
+        event.preventDefault();
+      } else if (event.key === 'Tab') {
+        this.trapFocusInModal(event);
+      }
+      return;
+    }
+
     // Don't handle shortcuts when typing in an input
     const target = event.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
@@ -114,6 +130,22 @@ export class TriageComponent {
         event.preventDefault();
         this.showHelp.update(v => !v);
         break;
+    }
+  }
+
+  private trapFocusInModal(event: KeyboardEvent): void {
+    const modal = document.querySelector('.help-modal');
+    if (!modal) return;
+    const focusable = modal.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      last.focus();
+      event.preventDefault();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      first.focus();
+      event.preventDefault();
     }
   }
 

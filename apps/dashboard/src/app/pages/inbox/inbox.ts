@@ -47,6 +47,13 @@ export class InboxComponent {
       this.filteredArticles(); // track dependency
       this.currentPage.set(1);
     }, { allowSignalWrites: true });
+
+    // Auto-focus close button when help modal opens
+    effect(() => {
+      if (this.showHelp()) {
+        setTimeout(() => (document.querySelector('.help-modal button') as HTMLElement)?.focus());
+      }
+    });
   }
 
   loading = signal(false);
@@ -528,6 +535,8 @@ export class InboxComponent {
       if (event.key === 'Escape' || event.key === '?') {
         this.showHelp.set(false);
         event.preventDefault();
+      } else if (event.key === 'Tab') {
+        this.trapFocusInModal(event);
       }
       return;
     }
@@ -623,6 +632,22 @@ export class InboxComponent {
           this.error.set(`Failed to delete "${article.title}"`);
         },
       });
+    }
+  }
+
+  private trapFocusInModal(event: KeyboardEvent): void {
+    const modal = document.querySelector('.help-modal');
+    if (!modal) return;
+    const focusable = modal.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      last.focus();
+      event.preventDefault();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      first.focus();
+      event.preventDefault();
     }
   }
 
