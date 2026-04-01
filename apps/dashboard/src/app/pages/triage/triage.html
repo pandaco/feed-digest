@@ -5,6 +5,16 @@
       <button class="btn btn-primary" (click)="loadInbox()" [disabled]="loading()">
         {{ loading() ? 'Loading...' : 'Load Inbox' }}
       </button>
+      @if (articles().length > 0) {
+        <button
+          class="btn btn-outline"
+          (click)="speedMode.update(v => !v)"
+          [class.active]="speedMode()"
+          title="Speed mode (m)"
+        >
+          {{ speedMode() ? 'Full' : 'Speed' }}
+        </button>
+      }
       <button class="btn btn-outline" (click)="showHelp.set(true)" title="Keyboard shortcuts">
         ?
       </button>
@@ -32,6 +42,8 @@
           <kbd>d</kbd> <span>Skip / Delete</span>
           <kbd>&rarr;</kbd> or <kbd>j</kbd> <span>Next (no action)</span>
           <kbd>&larr;</kbd> or <kbd>k</kbd> <span>Previous</span>
+          <kbd>z</kbd> <span>Undo last action</span>
+          <kbd>m</kbd> <span>Toggle speed mode</span>
           <kbd>?</kbd> <span>Toggle this help</span>
         </div>
         <button class="btn btn-outline help-close" (click)="showHelp.set(false)">Close</button>
@@ -54,19 +66,30 @@
         <a class="card-title" [href]="article.url" target="_blank" rel="noopener">{{ article.title }}</a>
         <span class="card-source">{{ article.feedSource }}</span>
       </div>
-      <div class="card-meta">
-        <span>Published: {{ formatDate(article.publishedAt) }}</span>
-        <span>Scraper: {{ article.scraperSource || '-' }}</span>
-        <span class="badge badge-{{ article.importance }}">{{ article.importance }}</span>
-      </div>
+      @if (!speedMode()) {
+        <div class="card-meta">
+          <span>Published: {{ formatDate(article.publishedAt) }}</span>
+          <span>Scraper: {{ article.scraperSource || '-' }}</span>
+          <span class="badge badge-{{ article.importance }}">{{ article.importance }}</span>
+        </div>
+      }
       <div class="card-tags">
         @for (tag of article.tags; track tag) {
           <span [class]="tagBadgeClass(tag)">{{ tag }}</span>
         }
+        @if (speedMode()) {
+          <span class="badge badge-{{ article.importance }}">{{ article.importance }}</span>
+        }
       </div>
-      <div class="card-summary">
-        <p>{{ article.summary }}</p>
-      </div>
+      @if (speedMode()) {
+        <div class="card-summary card-summary-speed">
+          <p>{{ article.summary.split('. ')[0] }}.</p>
+        </div>
+      } @else {
+        <div class="card-summary">
+          <p>{{ article.summary }}</p>
+        </div>
+      }
       <div class="card-actions">
         <button
           class="action-btn action-save"
@@ -97,6 +120,14 @@
           [disabled]="!canGoPrevious()"
         >
           &larr; Previous
+        </button>
+        <button
+          class="btn btn-outline btn-sm"
+          (click)="undoLastAction()"
+          [disabled]="!canUndo()"
+          title="Undo last action (z)"
+        >
+          Undo
         </button>
       </div>
     </div>

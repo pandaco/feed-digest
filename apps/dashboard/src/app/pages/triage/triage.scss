@@ -245,10 +245,17 @@ kbd {
   }
 }
 
+// Speed mode: compact summary
+.card-summary-speed p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
 // Card navigation
 .card-nav {
   display: flex;
   justify-content: flex-start;
+  gap: 0.5rem;
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border-light);

@@ -40,12 +40,20 @@ export class TriageComponent {
   articles = signal<Article[]>([]);
   currentIndex = signal(0);
   showHelp = signal(false);
+  speedMode = signal(false);
 
   savedCount = signal(0);
   skippedCount = signal(0);
 
   // Track which indices have been actioned (saved or skipped)
   actionedIndices = signal<Set<number>>(new Set());
+
+  // Undo stack: stores last action so it can be reversed
+  private undoStack = signal<{ index: number; action: 'saved' | 'skipped'; articleId: string }[]>([]);
+
+  // Timing: track when triage started and decisions made
+  private triageStartedAt = 0;
+  private decisionCount = signal(0);
 
   currentArticle = computed(() => {
     const list = this.articles();
@@ -67,8 +75,20 @@ export class TriageComponent {
   });
 
   progressStats = computed(() => {
-    return `Saved: ${this.savedCount()} · Skipped: ${this.skippedCount()}`;
+    const parts = [`Saved: ${this.savedCount()}`, `Skipped: ${this.skippedCount()}`];
+    const avg = this.avgTimePerDecision();
+    if (avg) parts.push(`Avg: ${avg}s`);
+    return parts.join(' · ');
   });
+
+  avgTimePerDecision = computed(() => {
+    const count = this.decisionCount();
+    if (count === 0 || this.triageStartedAt === 0) return null;
+    const elapsed = (Date.now() - this.triageStartedAt) / 1000;
+    return Math.round(elapsed / count);
+  });
+
+  canUndo = computed(() => this.undoStack().length > 0);
 
   done = computed(() => {
     const list = this.articles();
@@ -126,6 +146,14 @@ export class TriageComponent {
         event.preventDefault();
         this.goToPrevious();
         break;
+      case 'z':
+        event.preventDefault();
+        this.undoLastAction();
+        break;
+      case 'm':
+        event.preventDefault();
+        this.speedMode.update(v => !v);
+        break;
       case '?':
         event.preventDefault();
         this.showHelp.update(v => !v);
@@ -156,6 +184,9 @@ export class TriageComponent {
     this.savedCount.set(0);
     this.skippedCount.set(0);
     this.actionedIndices.set(new Set());
+    this.undoStack.set([]);
+    this.decisionCount.set(0);
+    this.triageStartedAt = Date.now();
 
     this.service.getInbox().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (articles) => {
@@ -176,10 +207,13 @@ export class TriageComponent {
     this.saving.set(true);
     this.error.set(null);
 
+    const idx = this.currentIndex();
     this.service.saveArticles([article.id]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.savedCount.update(n => n + 1);
-        this.actionedIndices.update(set => new Set(set).add(this.currentIndex()));
+        this.decisionCount.update(n => n + 1);
+        this.actionedIndices.update(set => new Set(set).add(idx));
+        this.undoStack.update(stack => [...stack, { index: idx, action: 'saved', articleId: article.id }]);
         this.saving.set(false);
         this.advanceToNext();
       },
@@ -197,10 +231,13 @@ export class TriageComponent {
     this.skipping.set(true);
     this.error.set(null);
 
+    const idx = this.currentIndex();
     this.service.deleteArticle(article.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.skippedCount.update(n => n + 1);
-        this.actionedIndices.update(set => new Set(set).add(this.currentIndex()));
+        this.decisionCount.update(n => n + 1);
+        this.actionedIndices.update(set => new Set(set).add(idx));
+        this.undoStack.update(stack => [...stack, { index: idx, action: 'skipped', articleId: article.id }]);
         this.skipping.set(false);
         this.advanceToNext();
       },
@@ -219,6 +256,32 @@ export class TriageComponent {
   goToPrevious(): void {
     if (!this.canGoPrevious()) return;
     this.currentIndex.update(i => i - 1);
+  }
+
+  undoLastAction(): void {
+    const stack = this.undoStack();
+    if (stack.length === 0 || this.saving() || this.skipping()) return;
+
+    const last = stack[stack.length - 1];
+    this.undoStack.update(s => s.slice(0, -1));
+
+    // Revert counters
+    if (last.action === 'saved') {
+      this.savedCount.update(n => Math.max(0, n - 1));
+    } else {
+      this.skippedCount.update(n => Math.max(0, n - 1));
+    }
+    this.decisionCount.update(n => Math.max(0, n - 1));
+
+    // Remove from actioned set
+    this.actionedIndices.update(set => {
+      const next = new Set(set);
+      next.delete(last.index);
+      return next;
+    });
+
+    // Navigate back to that article
+    this.currentIndex.set(last.index);
   }
 
   private advanceToNext(): void {
