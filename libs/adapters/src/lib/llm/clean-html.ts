@@ -17,7 +17,7 @@ export function cleanHtml(raw: string): string {
 
   // Convert markdown unordered lists (- item or * item) that aren't already in HTML
   // Only convert lines that start with - or * and aren't inside HTML tags
-  html = html.replace(/^[\-\*]\s+(.+)$/gm, (_, content) => {
+  html = html.replace(/^[-*]\s+(.+)$/gm, (_, content) => {
     // Skip if already wrapped in <li>
     if (content.trim().startsWith('<')) return content;
     return `<li>${content}</li>`;
