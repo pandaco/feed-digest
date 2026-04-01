@@ -10,6 +10,7 @@ import {
   TelegramSession,
   normalizeTag,
   deduplicate,
+  filterNoise,
 } from '@feed-digest/core';
 
 export interface RunPipelineOptions {
@@ -311,9 +312,14 @@ export async function runPipeline(options: RunPipelineOptions): Promise<void> {
       return;
     }
 
-    const { unique: metadata, duplicates } = deduplicate(rawMetadata);
+    const { unique: dedupedMetadata, duplicates } = deduplicate(rawMetadata);
     if (duplicates.length > 0) {
-      console.log(`[Pipeline] Deduplicated: ${duplicates.length} duplicate(s) removed, ${metadata.length} unique articles to process.`);
+      console.log(`[Pipeline] Deduplicated: ${duplicates.length} duplicate(s) removed, ${dedupedMetadata.length} unique articles to process.`);
+    }
+
+    const { kept: metadata, noise } = filterNoise(dedupedMetadata);
+    if (noise.length > 0) {
+      console.log(`[Pipeline] Auto-archived: ${noise.length} noise article(s) filtered (too short, ads, blacklisted).`);
     }
 
     console.log(`[Pipeline] Collected ${metadata.length} articles. Processing...`);

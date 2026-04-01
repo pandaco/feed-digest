@@ -10,3 +10,4 @@ export * from './lib/tag-preference';
 export * from './lib/tag-preference.port';
 export * from './lib/normalize-tags';
 export * from './lib/deduplicate';
+export * from './lib/noise-filter';
