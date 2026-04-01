@@ -3,6 +3,7 @@ import express from 'express';
 import * as dotenv from 'dotenv';
 import { FileSessionAdapter, TelegramAdapter, createStorage, createTagPreference, createLlm } from '@feed-digest/adapters';
 import { handleCallback } from '@feed-digest/pipeline';
+import { normalizeTag } from '@feed-digest/core';
 
 dotenv.config();
 
@@ -107,8 +108,9 @@ async function startPolling() {
       res.status(400).json({ error: 'override must be "auto", "filtered", or null' });
       return;
     }
-    await tagPreference.setTagOverride(req.params['chatId'], req.params['tag'], override);
-    res.json({ tag: req.params['tag'], override });
+    const tag = normalizeTag(req.params['tag']);
+    await tagPreference.setTagOverride(req.params['chatId'], tag, override);
+    res.json({ tag, override });
   });
 
   app.delete('/api/preferences/:chatId', async (req, res) => {

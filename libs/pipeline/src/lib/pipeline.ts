@@ -7,7 +7,8 @@ import {
   SessionPort,
   StoragePort,
   TagPreferencePort,
-  TelegramSession
+  TelegramSession,
+  normalizeTag,
 } from '@feed-digest/core';
 
 export interface RunPipelineOptions {
@@ -43,7 +44,8 @@ function computeImportance(
   let allFiltered = true;
 
   for (const tag of tags) {
-    const override = tagOverrides[tag];
+    const key = normalizeTag(tag);
+    const override = tagOverrides[key];
 
     if (override === 'auto') {
       hasAuto = true;
@@ -58,7 +60,7 @@ function computeImportance(
     allFiltered = false;
 
     // Score-based: if the user frequently selects this tag, it's important
-    const stats = tagPrefs[tag];
+    const stats = tagPrefs[key];
     if (stats && stats.presentedCount >= minRuns) {
       const score = stats.selectionCount / stats.presentedCount;
       if (score >= threshold) hasAccepted = true;
@@ -177,7 +179,7 @@ export async function buildNotificationData(options: BuildNotificationDataOption
     if (prefs) {
       const overrides = prefs.tagOverrides ?? {};
       for (const tag of Object.keys(sessionTags)) {
-        const override = overrides[tag];
+        const override = overrides[normalizeTag(tag)];
 
         if (override === 'filtered') {
           filteredTags.add(tag);
@@ -191,7 +193,7 @@ export async function buildNotificationData(options: BuildNotificationDataOption
         }
 
         // Default: threshold-based auto-selection
-        const stats = prefs.tags[tag];
+        const stats = prefs.tags[normalizeTag(tag)];
         if (stats && stats.presentedCount >= minRuns) {
           const score = stats.selectionCount / stats.presentedCount;
           if (score >= threshold) {

@@ -1,4 +1,4 @@
-import { NotifierPort, SessionPort, StoragePort, TagPreferencePort } from '@feed-digest/core';
+import { NotifierPort, SessionPort, StoragePort, TagPreferencePort, normalizeTag } from '@feed-digest/core';
 
 export interface HandleCallbackOptions {
   callbackQuery: any;
@@ -29,7 +29,7 @@ export async function handleCallback(options: HandleCallbackOptions): Promise<vo
 
   // --- 1. Handle Tag Toggle ---
   if (data.startsWith('toggle:')) {
-    const tagName = data.split('toggle:')[1];
+    const tagName = normalizeTag(data.split('toggle:')[1]);
     if (currentSession.tags[tagName]) {
       // Toggle state
       currentSession.tags[tagName].selected = !currentSession.tags[tagName].selected;

@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { Article, LlmPort, EnrichInput, EnrichOutput } from '@feed-digest/core';
+import { Article, LlmPort, EnrichInput, EnrichOutput, normalizeTags } from '@feed-digest/core';
 import { cleanHtml } from './clean-html';
 
 export class ClaudeAdapter implements LlmPort {
@@ -113,7 +113,8 @@ ${items}`;
     try {
       // Handle potential markdown code blocks
       const jsonString = content.replace(/```json|```/g, '').trim();
-      return JSON.parse(jsonString);
+      const parsed = JSON.parse(jsonString);
+      return { ...parsed, tags: normalizeTags(parsed.tags ?? []) };
     } catch {
       console.warn('[ClaudeAdapter] JSON parsing failed for response:', content);
       return this.fallback(title);

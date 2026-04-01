@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { TagOverride, TagPreference, TagPreferencePort } from '@feed-digest/core';
+import { TagOverride, TagPreference, TagPreferencePort, normalizeTag } from '@feed-digest/core';
 
 export class FileTagPreferenceAdapter implements TagPreferencePort {
   private readonly filePath: string;
@@ -28,7 +28,8 @@ export class FileTagPreferenceAdapter implements TagPreferencePort {
     const tags = existing?.tags ?? {};
     const now = new Date().toISOString();
 
-    for (const [tag, selected] of Object.entries(selections)) {
+    for (const [rawTag, selected] of Object.entries(selections)) {
+      const tag = normalizeTag(rawTag);
       if (!tags[tag]) {
         tags[tag] = { selectionCount: 0, presentedCount: 0 };
       }
@@ -57,11 +58,12 @@ export class FileTagPreferenceAdapter implements TagPreferencePort {
     console.log(`[FileTagPref] Preferences reset locally for chatId: ${chatId}`);
   }
 
-  async setTagOverride(chatId: string, tag: string, override: TagOverride | null): Promise<void> {
+  async setTagOverride(chatId: string, rawTag: string, override: TagOverride | null): Promise<void> {
     const store = this.readStore();
     const existing = store[chatId];
     if (!existing) return;
 
+    const tag = normalizeTag(rawTag);
     const overrides = existing.tagOverrides ?? {};
     if (override === null) {
       delete overrides[tag];

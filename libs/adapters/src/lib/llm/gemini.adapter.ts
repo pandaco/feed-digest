@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, GenerationConfig } from '@google/generative-ai';
-import { Article, LlmPort, EnrichInput, EnrichOutput } from '@feed-digest/core';
+import { Article, LlmPort, EnrichInput, EnrichOutput, normalizeTags } from '@feed-digest/core';
 import { cleanHtml } from './clean-html';
 
 export class GeminiAdapter implements LlmPort {
@@ -116,7 +116,8 @@ ${items}`;
     try {
       // Even with responseMimeType, Gemini sometimes wraps with markdown
       const jsonString = content.replace(/```json|```/g, '').trim();
-      return JSON.parse(jsonString);
+      const parsed = JSON.parse(jsonString);
+      return { ...parsed, tags: normalizeTags(parsed.tags ?? []) };
     } catch {
       console.warn('[GeminiAdapter] JSON parsing failed for response:', content);
       return this.fallback(title);

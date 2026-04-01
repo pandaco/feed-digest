@@ -5,7 +5,7 @@ import {
   PutCommand,
   DeleteCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { TagOverride, TagPreference, TagPreferencePort } from '@feed-digest/core';
+import { TagOverride, TagPreference, TagPreferencePort, normalizeTag } from '@feed-digest/core';
 
 export class DynamoDbTagPreferenceAdapter implements TagPreferencePort {
   private docClient: DynamoDBDocumentClient;
@@ -22,7 +22,8 @@ export class DynamoDbTagPreferenceAdapter implements TagPreferencePort {
     const tags = existing?.tags ?? {};
     const now = new Date().toISOString();
 
-    for (const [tag, selected] of Object.entries(selections)) {
+    for (const [rawTag, selected] of Object.entries(selections)) {
+      const tag = normalizeTag(rawTag);
       if (!tags[tag]) {
         tags[tag] = { selectionCount: 0, presentedCount: 0 };
       }
@@ -65,10 +66,11 @@ export class DynamoDbTagPreferenceAdapter implements TagPreferencePort {
     console.log(`[DynamoDbTagPref] Preferences reset for chatId: ${chatId}`);
   }
 
-  async setTagOverride(chatId: string, tag: string, override: TagOverride | null): Promise<void> {
+  async setTagOverride(chatId: string, rawTag: string, override: TagOverride | null): Promise<void> {
     const existing = await this.get(chatId);
     if (!existing) return;
 
+    const tag = normalizeTag(rawTag);
     const overrides = existing.tagOverrides ?? {};
     if (override === null) {
       delete overrides[tag];
