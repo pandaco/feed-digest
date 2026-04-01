@@ -16,8 +16,16 @@
   }
 
   @if (showHelp()) {
-    <div class="help-overlay" (click)="showHelp.set(false)" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-      <div class="help-modal" (click)="$event.stopPropagation()">
+    <div
+      class="help-overlay"
+      (click)="showHelp.set(false)"
+      (keydown.escape)="showHelp.set(false)"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Keyboard shortcuts"
+      tabindex="0"
+    >
+      <div class="help-modal" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()" tabindex="-1">
         <h2>Keyboard Shortcuts</h2>
         <div class="help-grid">
           <kbd>s</kbd> <span>Save article</span>

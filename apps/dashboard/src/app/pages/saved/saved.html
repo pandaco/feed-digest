@@ -156,8 +156,13 @@
       @if (showAdvancedFilters()) {
         <div class="advanced-filters">
           <div class="advanced-filter-row">
-            <label class="advanced-filter-label">Scraper:</label>
-            <select class="filter-select" [ngModel]="scraperSourceFilter()" (ngModelChange)="scraperSourceFilter.set($event)">
+            <label class="advanced-filter-label" for="scraper-filter-saved">Scraper:</label>
+            <select
+              id="scraper-filter-saved"
+              class="filter-select"
+              [ngModel]="scraperSourceFilter()"
+              (ngModelChange)="scraperSourceFilter.set($event)"
+            >
               <option value="all">All Scrapers</option>
               @for (src of uniqueScraperSources(); track src) {
                 <option [value]="src">{{ src }}</option>
@@ -166,7 +171,7 @@
           </div>
 
           <div class="advanced-filter-row advanced-filter-tags">
-            <label class="advanced-filter-label">Tags:</label>
+            <span class="advanced-filter-label">Tags:</span>
             <div class="tag-chips" role="group" aria-label="Filter by tag">
               @for (tag of visibleTags(); track tag.name) {
                 <button

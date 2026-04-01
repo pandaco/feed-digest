@@ -434,12 +434,10 @@ export class InboxComponent {
 
     this.prefService.getPreferences(chatId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (prefs) => {
-        const threshold = prefs.threshold;
-        const minRuns = prefs.minRuns;
         const overrides = prefs.tagOverrides ?? {};
         const states: Record<string, string> = {};
 
-        for (const [tag, stats] of Object.entries(prefs.tags)) {
+        for (const [tag] of Object.entries(prefs.tags)) {
           const override = overrides[tag];
           if (override === 'filtered') {
             states[tag] = 'filtered';

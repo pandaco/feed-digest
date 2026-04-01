@@ -11,8 +11,16 @@
 
   <!-- Keyboard shortcuts help -->
   @if (showHelp()) {
-    <div class="help-overlay" (click)="showHelp.set(false)" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-      <div class="help-modal" (click)="$event.stopPropagation()">
+    <div
+      class="help-overlay"
+      (click)="showHelp.set(false)"
+      (keydown.escape)="showHelp.set(false)"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Keyboard shortcuts"
+      tabindex="0"
+    >
+      <div class="help-modal" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()" tabindex="-1">
         <h2>Keyboard Shortcuts</h2>
         <div class="help-grid">
           <kbd>j</kbd><span>Next article</span>
@@ -253,8 +261,13 @@
       @if (showAdvancedFilters()) {
         <div class="advanced-filters">
           <div class="advanced-filter-row">
-            <label class="advanced-filter-label">Scraper:</label>
-            <select class="filter-select" [ngModel]="scraperSourceFilter()" (ngModelChange)="scraperSourceFilter.set($event)">
+            <label class="advanced-filter-label" for="scraper-filter">Scraper:</label>
+            <select
+              id="scraper-filter"
+              class="filter-select"
+              [ngModel]="scraperSourceFilter()"
+              (ngModelChange)="scraperSourceFilter.set($event)"
+            >
               <option value="all">All Scrapers</option>
               @for (src of uniqueScraperSources(); track src) {
                 <option [value]="src">{{ src }}</option>
@@ -263,7 +276,7 @@
           </div>
 
           <div class="advanced-filter-row advanced-filter-tags">
-            <label class="advanced-filter-label">Tags:</label>
+            <span class="advanced-filter-label">Tags:</span>
             <div class="tag-chips" role="group" aria-label="Filter by tag">
               @for (tag of visibleTags(); track tag.name) {
                 <button

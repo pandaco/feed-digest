@@ -85,7 +85,7 @@ export class TriageComponent {
 
   formatDate = formatDate;
 
-  tagBadgeClass(tag: string): string {
+  tagBadgeClass(_tag: string): string {
     return 'badge badge-tag';
   }
 
