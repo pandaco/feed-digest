@@ -9,3 +9,4 @@ export * from './lib/id-generator';
 export * from './lib/tag-preference';
 export * from './lib/tag-preference.port';
 export * from './lib/normalize-tags';
+export * from './lib/deduplicate';

@@ -9,6 +9,7 @@ import {
   TagPreferencePort,
   TelegramSession,
   normalizeTag,
+  deduplicate,
 } from '@feed-digest/core';
 
 export interface RunPipelineOptions {
@@ -303,11 +304,16 @@ export async function runPipeline(options: RunPipelineOptions): Promise<void> {
   try {
     console.log(`[Pipeline] Starting run at ${runAtDate.toLocaleString()} (limit: ${limit}, lang: ${options.summaryLang}, concurrency: ${concurrency})`);
 
-    const { articles: metadata, remaining } = await options.scraper.collect(limit);
+    const { articles: rawMetadata, remaining } = await options.scraper.collect(limit);
 
-    if (metadata.length === 0) {
+    if (rawMetadata.length === 0) {
       console.log('[Pipeline] No unread articles found. Exiting.');
       return;
+    }
+
+    const { unique: metadata, duplicates } = deduplicate(rawMetadata);
+    if (duplicates.length > 0) {
+      console.log(`[Pipeline] Deduplicated: ${duplicates.length} duplicate(s) removed, ${metadata.length} unique articles to process.`);
     }
 
     console.log(`[Pipeline] Collected ${metadata.length} articles. Processing...`);
