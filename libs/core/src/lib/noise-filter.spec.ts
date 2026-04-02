@@ -44,6 +44,16 @@ describe('filterNoise', () => {
     expect(strict.kept).toHaveLength(0);
   });
 
+  it('should keep articles with empty excerpt (content not yet fetched)', () => {
+    const items = [
+      item('Article without content', 'https://a.com/1', ''),
+      item('Another one', 'https://b.com/2', '   '),
+    ];
+    const result = filterNoise(items);
+    expect(result.kept).toHaveLength(2);
+    expect(result.noise).toHaveLength(0);
+  });
+
   it('should handle empty input', () => {
     const result = filterNoise([]);
     expect(result.kept).toHaveLength(0);

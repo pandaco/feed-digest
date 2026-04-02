@@ -61,7 +61,7 @@ export function filterNoise<T extends Filterable>(
 
     const isTitleBlacklisted = titleBlacklist.some(pattern => titleLower.includes(pattern));
     const isDomainBlacklisted = domainBlacklist.size > 0 && domainBlacklist.has(domain);
-    const isTooShort = item.excerpt.trim().length < minLength;
+    const isTooShort = item.excerpt.trim().length > 0 && item.excerpt.trim().length < minLength;
 
     if (isTitleBlacklisted || isDomainBlacklisted || isTooShort) {
       noise.push(item);
