@@ -8,7 +8,6 @@
 import * as dotenv from 'dotenv';
 import { JSDOM } from 'jsdom';
 import { createStorage } from '@feed-digest/adapters';
-import { Article } from '@feed-digest/core';
 
 dotenv.config();
 

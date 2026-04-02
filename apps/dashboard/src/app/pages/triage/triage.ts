@@ -105,6 +105,7 @@ export class TriageComponent {
 
   formatDate = formatDate;
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   tagBadgeClass(_tag: string): string {
     return 'badge badge-tag';
   }
