@@ -1,3 +1,61 @@
+## 0.2.0 (2026-04-02)
+
+### 🚀 Features
+
+- **adapters:** add TagPreference adapters and factory ([be082fc](https://github.com/pandaco/feed-digest/commit/be082fc))
+- **adapters:** support pre-selected tags in Telegram keyboard ([bead5c3](https://github.com/pandaco/feed-digest/commit/bead5c3))
+- **adapters:** implement tag override in DynamoDB and file adapters ([0046aec](https://github.com/pandaco/feed-digest/commit/0046aec))
+- **adapters:** add composite scraper, date extraction, scraper source, and message truncation ([f0a042a](https://github.com/pandaco/feed-digest/commit/f0a042a))
+- **apps:** inject tagPreference in scraper and webhook ([30320b8](https://github.com/pandaco/feed-digest/commit/30320b8))
+- **core:** add TagPreference domain model and port ([9653d2d](https://github.com/pandaco/feed-digest/commit/9653d2d))
+- **core:** add tag overrides and run count to tag preference model ([4361a9d](https://github.com/pandaco/feed-digest/commit/4361a9d))
+- **core:** add summarizeInbox to LLM port and adapters ([c52116f](https://github.com/pandaco/feed-digest/commit/c52116f))
+- **core:** add getFromSaved and deleteFromSaved to storage port and adapters ([7eade90](https://github.com/pandaco/feed-digest/commit/7eade90))
+- **core:** add FetchContentResult, scraper source field, and remove importance from LLM ([4417777](https://github.com/pandaco/feed-digest/commit/4417777))
+- **core:** normalize tags to lowercase across the entire pipeline ([5e47296](https://github.com/pandaco/feed-digest/commit/5e47296))
+- **core:** deduplicate articles by URL and title similarity ([0865ae7](https://github.com/pandaco/feed-digest/commit/0865ae7))
+- **core:** auto-archive noise articles before LLM enrichment ([72fd6ed](https://github.com/pandaco/feed-digest/commit/72fd6ed))
+- **dashboard:** add Angular dashboard app with tag preferences page ([3ce9ee5](https://github.com/pandaco/feed-digest/commit/3ce9ee5))
+- **dashboard:** add tag state management with filters and search ([9785705](https://github.com/pandaco/feed-digest/commit/9785705))
+- **dashboard:** add inbox page with filtering, bulk actions, and AI summary ([4189738](https://github.com/pandaco/feed-digest/commit/4189738))
+- **dashboard:** add global auth, saved page, and inbox save actions ([1171982](https://github.com/pandaco/feed-digest/commit/1171982))
+- **dashboard:** add triage view, increase CSS budget, and update shared styles ([ade09bc](https://github.com/pandaco/feed-digest/commit/ade09bc))
+- **dashboard:** add keyboard shortcuts, temporal histogram, advanced filters, and improve table layout ([2458fe8](https://github.com/pandaco/feed-digest/commit/2458fe8))
+- **dashboard:** replace source dropdown with multi-select chip filters ([1720190](https://github.com/pandaco/feed-digest/commit/1720190))
+- **dashboard:** move shared styles to global stylesheet ([b777f7f](https://github.com/pandaco/feed-digest/commit/b777f7f))
+- **dashboard:** add pagination and responsive search input ([378acaf](https://github.com/pandaco/feed-digest/commit/378acaf))
+- **dashboard:** add dark mode via CSS custom properties ([e6dd479](https://github.com/pandaco/feed-digest/commit/e6dd479))
+- **dashboard:** add importance badge icons and timeline tooltips ([fa5b2c8](https://github.com/pandaco/feed-digest/commit/fa5b2c8))
+- **dashboard:** add undo, speed mode and avg time to triage view ([abf40d8](https://github.com/pandaco/feed-digest/commit/abf40d8))
+- **pipeline:** integrate tag preference learning in pipeline ([0746289](https://github.com/pandaco/feed-digest/commit/0746289))
+- **pipeline:** support tag overrides for filtering and auto-selection ([b7c742c](https://github.com/pandaco/feed-digest/commit/b7c742c))
+- **pipeline:** compute importance from tag preferences and route all articles to inbox ([ae9b25e](https://github.com/pandaco/feed-digest/commit/ae9b25e))
+- **scraper:** add fix-dates script to correct publication dates in bulk ([e7ed943](https://github.com/pandaco/feed-digest/commit/e7ed943))
+- **telegram:** display article count per tag in keyboard buttons ([d5eef76](https://github.com/pandaco/feed-digest/commit/d5eef76))
+- **webhook:** add local Express API server for dashboard ([dacee9e](https://github.com/pandaco/feed-digest/commit/dacee9e))
+- **webhook:** add inbox REST API endpoints ([e777720](https://github.com/pandaco/feed-digest/commit/e777720))
+- **webhook:** add inbox save and saved articles API endpoints ([07c3f23](https://github.com/pandaco/feed-digest/commit/07c3f23))
+- **webhook:** add period-based summary and saved articles API ([01168fb](https://github.com/pandaco/feed-digest/commit/01168fb))
+
+### 🩹 Fixes
+
+- handle archived Notion pages and dashboard signal init ([6cbf9b9](https://github.com/pandaco/feed-digest/commit/6cbf9b9))
+- improve recover logging, Notion parallel deletes, and local server ([05f51da](https://github.com/pandaco/feed-digest/commit/05f51da))
+- resolve lint warnings for unused variables ([5c9d635](https://github.com/pandaco/feed-digest/commit/5c9d635))
+- **adapters:** remove unnecessary regex escape in clean-html ([75d5a9e](https://github.com/pandaco/feed-digest/commit/75d5a9e))
+- **ci:** update scraper workflow for run-once mode and production env ([cc8c740](https://github.com/pandaco/feed-digest/commit/cc8c740))
+- **dashboard:** use span instead of label for source filter heading ([9235568](https://github.com/pandaco/feed-digest/commit/9235568))
+- **dashboard:** harden security — sanitize HTML, sessionStorage, HTTP interceptor ([b5d9f3e](https://github.com/pandaco/feed-digest/commit/b5d9f3e))
+- **dashboard:** prevent memory leaks with takeUntilDestroyed on all subscriptions ([590389c](https://github.com/pandaco/feed-digest/commit/590389c))
+- **dashboard:** auto-dismiss errors on triage and tag-preferences pages ([2cc0085](https://github.com/pandaco/feed-digest/commit/2cc0085))
+- **dashboard:** add ARIA attributes to triage help modal ([64c971d](https://github.com/pandaco/feed-digest/commit/64c971d))
+- **dashboard:** add focus trap in help modals ([ff1a2fa](https://github.com/pandaco/feed-digest/commit/ff1a2fa))
+- **dashboard:** improve a11y on help modals, filters and unused vars ([301fde2](https://github.com/pandaco/feed-digest/commit/301fde2))
+
+### 🔥 Performance
+
+- **dashboard:** split computed chain, memoize dates, deduplicate logic ([5a3ed58](https://github.com/pandaco/feed-digest/commit/5a3ed58))
+
 ## 0.1.2 (2026-03-22)
 
 This was a version bump only, there were no code changes.
