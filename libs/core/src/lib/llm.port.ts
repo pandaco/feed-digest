@@ -13,6 +13,8 @@ export interface EnrichInput {
   language: string;
   /** Maximum number of tags to generate. */
   maxTags: number;
+  /** Free-text description of user interests for relevance scoring */
+  userInterests?: string;
 }
 
 /**
@@ -23,6 +25,8 @@ export interface EnrichOutput {
   summary: string;
   /** Free tags reflecting the main topics in the target language */
   tags: string[];
+  /** Relevance score (1-10) based on user interests */
+  relevanceScore: number;
 }
 
 /**

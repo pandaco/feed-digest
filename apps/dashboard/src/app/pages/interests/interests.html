@@ -1,0 +1,38 @@
+<div class="container">
+  <h1>My Interests</h1>
+  <p class="description">
+    Describe your interests in free text. The LLM will use this profile to score
+    each article's relevance (1-10) during enrichment. Keep it concise (~200 words max).
+  </p>
+
+  <div class="page-actions">
+    <button class="btn btn-primary" (click)="loadInterests()" [disabled]="loading()">
+      {{ loading() ? 'Loading...' : 'Load' }}
+    </button>
+  </div>
+
+  @if (error()) {
+    <div class="alert alert-error" role="alert">{{ error() }}</div>
+  }
+
+  @if (success()) {
+    <div class="alert alert-success" role="alert">{{ success() }}</div>
+  }
+
+  <div class="editor">
+    <textarea
+      class="interests-textarea"
+      [ngModel]="text()"
+      (ngModelChange)="text.set($event)"
+      placeholder="e.g. web development, AI/machine learning, cybersecurity, open source, cloud infrastructure, developer tools..."
+      rows="8"
+    ></textarea>
+
+    <div class="editor-footer">
+      <span class="word-count">{{ wordCount() }} words</span>
+      <button class="btn btn-primary" (click)="save()" [disabled]="saving()">
+        {{ saving() ? 'Saving...' : 'Save' }}
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,7 +1,7 @@
 import { Article } from '../services/inbox.service';
 
 export type ImportanceFilter = 'all' | 'high' | 'medium' | 'low';
-export type SortField = 'publishedAt' | 'runAt' | 'importance';
+export type SortField = 'publishedAt' | 'runAt' | 'importance' | 'relevanceScore';
 export type SortDirection = 'asc' | 'desc';
 
 export interface TagWithCount {
@@ -56,34 +56,32 @@ function searchScore(article: Article, q: string): number {
   return score;
 }
 
+function compareByField(a: Article, b: Article, field: SortField, dir: number): number {
+  if (field === 'importance') {
+    return ((IMPORTANCE_RANK[a.importance] || 0) - (IMPORTANCE_RANK[b.importance] || 0)) * dir;
+  }
+  if (field === 'relevanceScore') {
+    return ((a.relevanceScore || 0) - (b.relevanceScore || 0)) * dir;
+  }
+  return (a[field] < b[field] ? -1 : a[field] > b[field] ? 1 : 0) * dir;
+}
+
 export function searchAndSort(articles: Article[], query: string, field: SortField, direction: SortDirection): Article[] {
   let result = articles;
+  const dir = direction === 'asc' ? 1 : -1;
 
   const q = query.toLowerCase().trim();
   if (q) {
     result = result.filter(a => searchScore(a, q) > 0);
 
-    // When searching, sort by relevance first, then by selected field
-    const dir = direction === 'asc' ? 1 : -1;
     return [...result].sort((a, b) => {
       const scoreDiff = searchScore(b, q) - searchScore(a, q);
       if (scoreDiff !== 0) return scoreDiff;
-      if (field === 'importance') {
-        return ((IMPORTANCE_RANK[a.importance] || 0) - (IMPORTANCE_RANK[b.importance] || 0)) * dir;
-      }
-      return (a[field] < b[field] ? -1 : a[field] > b[field] ? 1 : 0) * dir;
+      return compareByField(a, b, field, dir);
     });
   }
 
-  const dir = direction === 'asc' ? 1 : -1;
-  result = [...result].sort((a, b) => {
-    if (field === 'importance') {
-      return ((IMPORTANCE_RANK[a.importance] || 0) - (IMPORTANCE_RANK[b.importance] || 0)) * dir;
-    }
-    return (a[field] < b[field] ? -1 : a[field] > b[field] ? 1 : 0) * dir;
-  });
-
-  return result;
+  return [...result].sort((a, b) => compareByField(a, b, field, dir));
 }
 
 export function countByField(articles: Article[], accessor: (a: Article) => string): { name: string; count: number }[] {

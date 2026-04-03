@@ -30,6 +30,8 @@ export interface Article {
   isSaved: boolean;
   /** Scraper source that collected this article (e.g. 'inoreader', 'inoreader-saved', 'feedly') */
   scraperSource: string;
+  /** LLM-generated relevance score (1-10) based on user interests */
+  relevanceScore?: number;
   /** ISO 8601 date until which the article is snoozed (hidden from inbox) */
   snoozedUntil?: string;
 }

@@ -12,11 +12,18 @@ export class ClaudeAdapter implements LlmPort {
   }
 
   async enrich(input: EnrichInput): Promise<EnrichOutput> {
-    const systemPrompt = `You are an information and technology watch assistant.
+    let systemPrompt = `You are an information and technology watch assistant.
       Respond ONLY with a valid JSON object, no markdown, no comments.
       Rules:
       - summary: written in ${input.language}, 3 to 5 sentences, factual and concise.
-      - tags: up to ${input.maxTags} tags in ${input.language}, freely inferred from content (main topics, technologies, themes).`;
+      - tags: up to ${input.maxTags} tags in ${input.language}, freely inferred from content (main topics, technologies, themes).
+      - relevanceScore: an integer from 1 to 10 reflecting how relevant this article is to the user's interests (10 = extremely relevant, 1 = not relevant at all).`;
+
+    if (input.userInterests) {
+      systemPrompt += `\n      The user's interests are: ${input.userInterests}. Use this to assess relevance.`;
+    } else {
+      systemPrompt += `\n      No user interests provided — default relevanceScore to 5.`;
+    }
 
     const userPrompt = `Here is the content of an article:
       <title>${input.title}</title>
@@ -25,7 +32,8 @@ export class ClaudeAdapter implements LlmPort {
       Respond with the following JSON format:
       {
         "summary": "...",
-        "tags": ["..."]
+        "tags": ["..."],
+        "relevanceScore": 5
       }`;
 
     try {
@@ -114,7 +122,8 @@ ${items}`;
       // Handle potential markdown code blocks
       const jsonString = content.replace(/```json|```/g, '').trim();
       const parsed = JSON.parse(jsonString);
-      return { ...parsed, tags: normalizeTags(parsed.tags ?? []) };
+      const score = typeof parsed.relevanceScore === 'number' ? Math.max(1, Math.min(10, Math.round(parsed.relevanceScore))) : 5;
+      return { ...parsed, tags: normalizeTags(parsed.tags ?? []), relevanceScore: score };
     } catch {
       console.warn('[ClaudeAdapter] JSON parsing failed for response:', content);
       return this.fallback(title);
@@ -125,6 +134,7 @@ ${items}`;
     return {
       summary: title,
       tags: [],
+      relevanceScore: 5,
     };
   }
 

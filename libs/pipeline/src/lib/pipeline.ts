@@ -105,12 +105,14 @@ async function enrichAndSave(
   const publishedAt = fetched.publishedAt || meta.publishedAt;
 
   console.log(`[Pipeline] ${tag} Enriching via ${options.llmProvider}...`);
+  const userInterests = process.env['USER_INTERESTS'] || '';
   const enrichment = await options.llm.enrich({
     title: meta.title,
     content: fullContent || meta.excerpt,
     contentUnavailable,
     language: languageName,
     maxTags: options.maxTags ?? 3,
+    userInterests: userInterests || undefined,
   });
 
   const importance = computeImportance(
@@ -131,6 +133,7 @@ async function enrichAndSave(
     llmProvider: options.llmProvider,
     summaryLanguage: options.summaryLang,
     isSaved: meta.isSaved,
+    relevanceScore: enrichment.relevanceScore,
   };
 
   console.log(`[Pipeline] ${tag} Importance: ${importance} | Stored in Inbox: ${article.title}`);

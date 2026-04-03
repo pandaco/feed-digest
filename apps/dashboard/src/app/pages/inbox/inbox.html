@@ -335,6 +335,9 @@
             </th>
             <th>Title</th>
             <th>Tags</th>
+            <th class="sortable col-score" (click)="toggleSort('relevanceScore')" title="LLM relevance score (1-10)">
+              Score{{ sortIcon('relevanceScore') }}
+            </th>
             <th class="col-actions"></th>
           </tr>
         </thead>
@@ -373,6 +376,13 @@
                   <span [class]="tagBadgeClass(tag)">{{ tag }}</span>
                 }
               </td>
+              <td class="col-score">
+                @if (article.relevanceScore) {
+                  <span class="score-badge" [class.score-high]="article.relevanceScore >= 7" [class.score-low]="article.relevanceScore <= 3">
+                    {{ article.relevanceScore }}
+                  </span>
+                }
+              </td>
               <td class="col-actions">
                 <button class="btn-icon btn-icon-success" title="Save" (click)="saveArticle(article)" [disabled]="isBusy(article.id)">
                   {{ isSaving(article.id) ? '...' : '\u2605' }}
@@ -396,7 +406,7 @@
             </tr>
             @if (expandedId() === article.id) {
               <tr class="detail-row">
-                <td colspan="6">
+                <td colspan="7">
                   <div class="detail-content">
                     <div class="detail-summary">
                       <h3>Summary</h3>

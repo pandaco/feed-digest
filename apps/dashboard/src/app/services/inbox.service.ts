@@ -17,6 +17,7 @@ export interface Article {
   summaryLanguage: string;
   isSaved: boolean;
   scraperSource: string;
+  relevanceScore?: number;
   snoozedUntil?: string;
 }
 
@@ -70,5 +71,13 @@ export class InboxService {
 
   getSnoozed(): Observable<Article[]> {
     return this.http.get<Article[]>(`${this.apiBase}/snoozed`);
+  }
+
+  getInterests(): Observable<{ text: string }> {
+    return this.http.get<{ text: string }>('/api/interests');
+  }
+
+  saveInterests(text: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>('/api/interests', { text });
   }
 }

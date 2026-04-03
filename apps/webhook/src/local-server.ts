@@ -1,5 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import express from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { FileSessionAdapter, TelegramAdapter, createStorage, createTagPreference, createLlm } from '@feed-digest/adapters';
 import { handleCallback } from '@feed-digest/pipeline';
@@ -116,6 +118,34 @@ async function startPolling() {
   app.delete('/api/preferences/:chatId', async (req, res) => {
     await tagPreference.reset(req.params['chatId']);
     res.json({ message: 'Preferences reset' });
+  });
+
+  // --- User Interests API ---
+  const interestsFilePath = path.join(process.cwd(), '.user-interests.txt');
+
+  app.get('/api/interests', (_req, res) => {
+    try {
+      const text = fs.existsSync(interestsFilePath) ? fs.readFileSync(interestsFilePath, 'utf-8') : '';
+      res.json({ text });
+    } catch (error) {
+      console.error('[API] Failed to read interests:', error);
+      res.status(500).json({ error: 'Failed to read interests' });
+    }
+  });
+
+  app.post('/api/interests', express.json(), (req, res) => {
+    try {
+      const { text } = req.body;
+      if (typeof text !== 'string') {
+        res.status(400).json({ error: 'text is required' });
+        return;
+      }
+      fs.writeFileSync(interestsFilePath, text, 'utf-8');
+      res.json({ message: 'Interests saved' });
+    } catch (error) {
+      console.error('[API] Failed to save interests:', error);
+      res.status(500).json({ error: 'Failed to save interests' });
+    }
   });
 
   // --- Inbox API ---
