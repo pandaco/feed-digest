@@ -17,6 +17,7 @@ export interface Article {
   summaryLanguage: string;
   isSaved: boolean;
   scraperSource: string;
+  snoozedUntil?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -51,5 +52,23 @@ export class InboxService {
       `${this.apiBase}/save`,
       { articleIds },
     );
+  }
+
+  snoozeArticle(articleId: string, snoozedUntil: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${this.apiBase}/${articleId}/snooze`,
+      { snoozedUntil },
+    );
+  }
+
+  unsnoozeArticle(articleId: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${this.apiBase}/${articleId}/unsnooze`,
+      {},
+    );
+  }
+
+  getSnoozed(): Observable<Article[]> {
+    return this.http.get<Article[]>(`${this.apiBase}/snoozed`);
   }
 }

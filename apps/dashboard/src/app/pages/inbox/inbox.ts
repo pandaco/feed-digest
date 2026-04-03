@@ -6,6 +6,7 @@ import { InboxService, Article } from '../../services/inbox.service';
 import { TagPreferenceService } from '../../services/tag-preference.service';
 import { AuthService } from '../../services/auth.service';
 import { formatDate } from '../../shared/format';
+import { getSnoozePresets, SnoozePreset } from '../../shared/snooze.utils';
 import {
   ImportanceFilter, SortField, SortDirection, COLLAPSED_TAG_LIMIT, PAGE_SIZE,
   applyStructuralFilters, searchAndSort, countByField, countTags,
@@ -647,6 +648,37 @@ export class InboxComponent {
       first.focus();
       event.preventDefault();
     }
+  }
+
+  // Snooze
+  snoozeMenuId = signal<string | null>(null);
+  snoozePresets = getSnoozePresets();
+  snoozingIds = signal<Set<string>>(new Set());
+
+  toggleSnoozeMenu(articleId: string): void {
+    this.snoozeMenuId.update(current => current === articleId ? null : articleId);
+  }
+
+  snoozeArticle(article: Article, preset: SnoozePreset): void {
+    this.snoozeMenuId.set(null);
+    if (this.snoozingIds().has(article.id)) return;
+
+    this.snoozingIds.update(set => new Set(set).add(article.id));
+
+    this.service.snoozeArticle(article.id, preset.value).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.articles.update(list => list.filter(a => a.id !== article.id));
+        this.snoozingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
+      },
+      error: () => {
+        this.snoozingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
+        this.error.set(`Failed to snooze "${article.title}"`);
+      },
+    });
+  }
+
+  isSnoozeBusy(id: string): boolean {
+    return this.snoozingIds().has(id);
   }
 
   formatDate = formatDate;

@@ -22,6 +22,11 @@ export const appRoutes: Route[] = [
       import('./pages/triage/triage').then((m) => m.TriageComponent),
   },
   {
+    path: 'snoozed',
+    loadComponent: () =>
+      import('./pages/snoozed/snoozed').then((m) => m.SnoozedComponent),
+  },
+  {
     path: 'preferences',
     loadComponent: () =>
       import('./pages/tag-preferences/tag-preferences').then(

@@ -1,0 +1,100 @@
+<div class="container">
+  <h1>Snoozed Articles</h1>
+
+  <div class="page-actions">
+    <button class="btn btn-primary" (click)="loadSnoozed()" [disabled]="loading()">
+      {{ loading() ? 'Loading...' : 'Load Snoozed' }}
+    </button>
+  </div>
+
+  @if (error()) {
+    <div class="alert alert-error" role="alert">{{ error() }}</div>
+  }
+
+  @if (loading() && articles().length === 0) {
+    <div class="skeleton">
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+    </div>
+  }
+
+  @if (!loading() && articles().length === 0) {
+    <div class="empty-state">No snoozed articles.</div>
+  }
+
+  @if (articles().length) {
+    <section class="stats-section">
+      <div class="stat-card">
+        <span class="stat-value">{{ totalCount() }}</span>
+        <span class="stat-label">Snoozed</span>
+      </div>
+    </section>
+
+    <table>
+      <thead>
+        <tr>
+          <th class="col-expand"></th>
+          <th>Title</th>
+          <th>Tags</th>
+          <th class="col-snooze">Snoozed until</th>
+          <th class="col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (article of articles(); track article.id) {
+          <tr [class]="'row-importance-' + article.importance">
+            <td class="col-expand">
+              <button class="btn-expand" (click)="toggleExpand(article.id)">
+                {{ expandedId() === article.id ? '\u25BC' : '\u25B6' }}
+              </button>
+            </td>
+            <td class="article-title" [title]="article.title">
+              <a [href]="article.url" target="_blank" rel="noopener">{{ article.title }}</a>
+              <span class="article-source">{{ article.feedSource }}</span>
+            </td>
+            <td class="article-tags">
+              @for (tag of article.tags; track tag) {
+                <span class="badge badge-tag">{{ tag }}</span>
+              }
+            </td>
+            <td class="col-snooze">
+              <span class="snooze-date" [title]="article.snoozedUntil || ''">{{ formatSnoozeDate(article.snoozedUntil || '') }}</span>
+            </td>
+            <td class="col-actions">
+              <button class="btn-icon" title="Unsnooze" (click)="unsnooze(article)" [disabled]="isUnsnoozing(article.id)">
+                {{ isUnsnoozing(article.id) ? '...' : '\u23F0' }}
+              </button>
+            </td>
+          </tr>
+          @if (expandedId() === article.id) {
+            <tr class="detail-row">
+              <td colspan="5">
+                <div class="detail-content">
+                  <div class="detail-summary">
+                    <h3>Summary</h3>
+                    <p>{{ article.summary }}</p>
+                  </div>
+                  <div class="detail-meta">
+                    <div class="meta-item">
+                      <span class="meta-label">Published</span>
+                      <span class="meta-value">{{ formatDate(article.publishedAt) }}</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-label">Source</span>
+                      <span class="meta-value">{{ article.feedSource }}</span>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-label">Snoozed Until</span>
+                      <span class="meta-value">{{ formatDate(article.snoozedUntil) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  }
+</div>

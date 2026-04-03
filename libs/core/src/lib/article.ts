@@ -30,4 +30,6 @@ export interface Article {
   isSaved: boolean;
   /** Scraper source that collected this article (e.g. 'inoreader', 'inoreader-saved', 'feedly') */
   scraperSource: string;
+  /** ISO 8601 date until which the article is snoozed (hidden from inbox) */
+  snoozedUntil?: string;
 }

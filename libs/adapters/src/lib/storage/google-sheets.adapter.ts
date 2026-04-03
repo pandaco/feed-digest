@@ -53,7 +53,7 @@ export class GoogleSheetsAdapter implements StoragePort {
         const headers = [
           'ID', 'Run At', 'Published At', 'Source', 'Title', 'URL', 'Tags',
           'Summary', 'Importance', 'Content Unavailable', 'LLM Provider', 'Summary Language',
-          'Scraper Source'
+          'Scraper Source', 'Snoozed Until'
         ];
         await this.writeHeaders(tab, headers);
       }
@@ -93,7 +93,7 @@ export class GoogleSheetsAdapter implements StoragePort {
   async getFromSaved(): Promise<Article[]> {
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: 'Saved!A:M',
+      range: 'Saved!A:N',
     });
 
     const rows = response.data.values;
@@ -107,7 +107,7 @@ export class GoogleSheetsAdapter implements StoragePort {
 
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: 'Saved!A:M',
+      range: 'Saved!A:N',
     });
 
     const rows = response.data.values;
@@ -121,7 +121,7 @@ export class GoogleSheetsAdapter implements StoragePort {
 
     await this.sheets.spreadsheets.values.clear({
       spreadsheetId: this.spreadsheetId,
-      range: 'Saved!A:M',
+      range: 'Saved!A:N',
     });
 
     await this.sheets.spreadsheets.values.update({
@@ -155,6 +155,7 @@ export class GoogleSheetsAdapter implements StoragePort {
       a.llmProvider,
       a.summaryLanguage,
       a.scraperSource || '',
+      a.snoozedUntil || '',
     ]);
 
     const result = await this.sheets.spreadsheets.values.append({
@@ -172,7 +173,7 @@ export class GoogleSheetsAdapter implements StoragePort {
 
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: 'Inbox!A:M',
+      range: 'Inbox!A:N',
     });
 
     const rows = response.data.values;
@@ -188,7 +189,7 @@ export class GoogleSheetsAdapter implements StoragePort {
     // Clear and rewrite
     await this.sheets.spreadsheets.values.clear({
       spreadsheetId: this.spreadsheetId,
-      range: 'Inbox!A:M',
+      range: 'Inbox!A:N',
     });
 
     await this.sheets.spreadsheets.values.update({
@@ -202,7 +203,7 @@ export class GoogleSheetsAdapter implements StoragePort {
   async getFromInbox(): Promise<Article[]> {
     const response = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: 'Inbox!A:M',
+      range: 'Inbox!A:N',
     });
 
     const rows = response.data.values;
@@ -225,7 +226,7 @@ export class GoogleSheetsAdapter implements StoragePort {
     for (const tab of tabs) {
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: `${tab}!A:M`,
+        range: `${tab}!A:N`,
       });
 
       const rows = response.data.values;
@@ -254,6 +255,7 @@ export class GoogleSheetsAdapter implements StoragePort {
         article.llmProvider,
         article.summaryLanguage,
         article.scraperSource || '',
+        article.snoozedUntil || '',
       ];
 
       dataRows[articleIndex] = updatedRow;
@@ -292,6 +294,7 @@ export class GoogleSheetsAdapter implements StoragePort {
       summaryLanguage: row[11],
       isSaved: false,
       scraperSource: row[12] || '',
+      snoozedUntil: row[13] || undefined,
     };
   }
 }

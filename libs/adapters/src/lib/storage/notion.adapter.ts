@@ -210,6 +210,7 @@ export class NotionAdapter implements StoragePort {
         if (includeScraperSource) {
           updateProps['Scraper Source'] = { rich_text: [{ text: { content: article.scraperSource || '' } }] };
         }
+        updateProps['Snoozed Until'] = { rich_text: [{ text: { content: article.snoozedUntil || '' } }] };
 
         try {
           await this.client.pages.update({ page_id: page.id, properties: updateProps as any });
@@ -243,6 +244,7 @@ export class NotionAdapter implements StoragePort {
       summaryLanguage: this.getRichText(props['Summary Language']),
       isSaved: false,
       scraperSource: this.getRichText(props['Scraper Source']),
+      snoozedUntil: this.getRichText(props['Snoozed Until']) || undefined,
     };
   }
 
@@ -286,6 +288,9 @@ export class NotionAdapter implements StoragePort {
     };
     if (includeScraperSource) {
       props['Scraper Source'] = { rich_text: [{ text: { content: article.scraperSource || '' } }] };
+    }
+    if (article.snoozedUntil) {
+      props['Snoozed Until'] = { rich_text: [{ text: { content: article.snoozedUntil } }] };
     }
     return props;
   }

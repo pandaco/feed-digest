@@ -122,10 +122,59 @@ async function startPolling() {
   app.get('/api/inbox', async (_req, res) => {
     try {
       const articles = await storage.getFromInbox();
-      res.json(articles);
+      const now = new Date().toISOString();
+      res.json(articles.filter(a => !a.snoozedUntil || a.snoozedUntil <= now));
     } catch (error) {
       console.error('[API] Failed to fetch inbox:', error);
       res.status(500).json({ error: 'Failed to fetch inbox' });
+    }
+  });
+
+  app.get('/api/inbox/snoozed', async (_req, res) => {
+    try {
+      const articles = await storage.getFromInbox();
+      const now = new Date().toISOString();
+      res.json(articles.filter(a => a.snoozedUntil && a.snoozedUntil > now));
+    } catch (error) {
+      console.error('[API] Failed to fetch snoozed articles:', error);
+      res.status(500).json({ error: 'Failed to fetch snoozed articles' });
+    }
+  });
+
+  app.post('/api/inbox/:articleId/snooze', express.json(), async (req, res) => {
+    const { snoozedUntil } = req.body;
+    if (!snoozedUntil || typeof snoozedUntil !== 'string') {
+      res.status(400).json({ error: 'snoozedUntil is required (ISO 8601 date)' });
+      return;
+    }
+    try {
+      const articles = await storage.getFromInbox();
+      const article = articles.find(a => a.id === req.params['articleId']);
+      if (!article) {
+        res.status(404).json({ error: 'Article not found' });
+        return;
+      }
+      await storage.updateArticle({ ...article, snoozedUntil });
+      res.json({ message: 'Article snoozed' });
+    } catch (error) {
+      console.error('[API] Failed to snooze article:', error);
+      res.status(500).json({ error: 'Failed to snooze article' });
+    }
+  });
+
+  app.post('/api/inbox/:articleId/unsnooze', express.json(), async (req, res) => {
+    try {
+      const articles = await storage.getFromInbox();
+      const article = articles.find(a => a.id === req.params['articleId']);
+      if (!article) {
+        res.status(404).json({ error: 'Article not found' });
+        return;
+      }
+      await storage.updateArticle({ ...article, snoozedUntil: undefined });
+      res.json({ message: 'Article unsnoozed' });
+    } catch (error) {
+      console.error('[API] Failed to unsnooze article:', error);
+      res.status(500).json({ error: 'Failed to unsnooze article' });
     }
   });
 

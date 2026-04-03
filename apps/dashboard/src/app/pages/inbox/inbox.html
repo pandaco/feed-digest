@@ -377,6 +377,18 @@
                 <button class="btn-icon btn-icon-success" title="Save" (click)="saveArticle(article)" [disabled]="isBusy(article.id)">
                   {{ isSaving(article.id) ? '...' : '\u2605' }}
                 </button>
+                <div class="snooze-wrapper">
+                  <button class="btn-icon btn-icon-snooze" title="Snooze" (click)="toggleSnoozeMenu(article.id)" [disabled]="isSnoozeBusy(article.id)">
+                    {{ isSnoozeBusy(article.id) ? '...' : '\u23F0' }}
+                  </button>
+                  @if (snoozeMenuId() === article.id) {
+                    <div class="snooze-menu">
+                      @for (preset of snoozePresets; track preset.label) {
+                        <button class="snooze-option" (click)="snoozeArticle(article, preset)">{{ preset.label }}</button>
+                      }
+                    </div>
+                  }
+                </div>
                 <button class="btn-icon btn-icon-danger" title="Delete" (click)="deleteArticle(article)" [disabled]="isBusy(article.id)">
                   {{ isDeleting(article.id) ? '...' : '\u2715' }}
                 </button>

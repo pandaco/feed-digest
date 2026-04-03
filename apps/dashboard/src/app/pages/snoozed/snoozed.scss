@@ -1,0 +1,13 @@
+:host {
+  display: block;
+}
+
+.col-snooze {
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.snooze-date {
+  font-weight: 500;
+  color: var(--color-primary, #6366f1);
+}
