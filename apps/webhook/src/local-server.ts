@@ -248,6 +248,27 @@ async function startPolling() {
     }
   });
 
+  app.post('/api/inbox/synthesize', express.json(), async (req, res) => {
+    const { articleIds } = req.body;
+    if (!Array.isArray(articleIds) || articleIds.length === 0) {
+      res.status(400).json({ error: 'articleIds must be a non-empty array' });
+      return;
+    }
+    try {
+      const allArticles = await storage.getFromInbox();
+      const toSynthesize = allArticles.filter(a => articleIds.includes(a.id));
+      if (toSynthesize.length === 0) {
+        res.status(404).json({ error: 'No matching articles found' });
+        return;
+      }
+      const html = await llm.summarizeInbox(toSynthesize, summaryLang);
+      res.json({ html });
+    } catch (error) {
+      console.error('[API] Failed to synthesize articles:', error);
+      res.status(500).json({ error: 'Failed to synthesize articles' });
+    }
+  });
+
   app.post('/api/inbox/bulk-delete', express.json(), async (req, res) => {
     const { articleIds } = req.body;
     if (!Array.isArray(articleIds) || articleIds.length === 0) {

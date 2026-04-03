@@ -628,6 +628,128 @@ kbd {
   word-break: break-all;
 }
 
+.view-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 1rem;
+}
+
+.view-toggle-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 6px;
+  background: var(--bg-surface, #fff);
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+
+  &.active {
+    background: var(--color-primary, #6366f1);
+    color: #fff;
+    border-color: var(--color-primary, #6366f1);
+  }
+}
+
+.cluster-count {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.clusters-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cluster-card {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cluster-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  background: var(--bg-hover, #f8fafc);
+
+  &:hover {
+    background: var(--bg-hover, #f1f5f9);
+  }
+}
+
+.cluster-toggle {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.cluster-label {
+  font-weight: 600;
+  flex: 1;
+}
+
+.cluster-article-count {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #64748b);
+  white-space: nowrap;
+}
+
+.cluster-tags {
+  display: flex;
+  gap: 4px;
+}
+
+.cluster-body {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+}
+
+.cluster-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cluster-synthesis {
+  padding: 12px;
+  background: var(--bg-hover, #f8fafc);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.cluster-articles {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-color, #f1f5f9);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    a {
+      flex: 1;
+    }
+  }
+}
+
+.unclustered-label {
+  padding: 12px;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
 .col-score {
   text-align: center;
   min-width: 50px;

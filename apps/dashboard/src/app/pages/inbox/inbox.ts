@@ -7,6 +7,7 @@ import { TagPreferenceService } from '../../services/tag-preference.service';
 import { AuthService } from '../../services/auth.service';
 import { formatDate } from '../../shared/format';
 import { getSnoozePresets, SnoozePreset } from '../../shared/snooze.utils';
+import { clusterArticles, getUnclusteredArticles, Cluster } from '../../shared/clustering.utils';
 import {
   ImportanceFilter, SortField, SortDirection, COLLAPSED_TAG_LIMIT, PAGE_SIZE,
   applyStructuralFilters, searchAndSort, countByField, countTags,
@@ -648,6 +649,68 @@ export class InboxComponent {
       first.focus();
       event.preventDefault();
     }
+  }
+
+  // Clustering
+  viewMode = signal<'list' | 'clusters'>('list');
+  expandedClusters = signal<Set<string>>(new Set());
+  clusterSynthesis = signal<Record<string, string>>({});
+  synthesizingCluster = signal<string | null>(null);
+
+  clusters = computed(() => clusterArticles(this.filteredArticles()));
+  unclusteredArticles = computed(() => getUnclusteredArticles(this.filteredArticles(), this.clusters()));
+
+  toggleClusterExpand(clusterId: string): void {
+    this.expandedClusters.update(set => {
+      const next = new Set(set);
+      if (next.has(clusterId)) next.delete(clusterId);
+      else next.add(clusterId);
+      return next;
+    });
+  }
+
+  isClusterExpanded(clusterId: string): boolean {
+    return this.expandedClusters().has(clusterId);
+  }
+
+  synthesizeCluster(cluster: Cluster): void {
+    this.synthesizingCluster.set(cluster.id);
+    const ids = cluster.articles.map(a => a.id);
+
+    this.service.synthesize(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (res) => {
+        this.clusterSynthesis.update(map => ({ ...map, [cluster.id]: this.sanitizer.sanitize(SecurityContext.HTML, res.html) || '' }));
+        this.synthesizingCluster.set(null);
+      },
+      error: () => {
+        this.error.set('Failed to synthesize cluster');
+        this.synthesizingCluster.set(null);
+      },
+    });
+  }
+
+  saveBestArchiveRest(cluster: Cluster): void {
+    // Sort by relevanceScore desc, then by importance
+    const sorted = [...cluster.articles].sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
+    const best = sorted[0];
+    const rest = sorted.slice(1);
+
+    if (!best || rest.length === 0) return;
+
+    // Save best
+    this.service.saveArticles([best.id]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        // Delete rest
+        this.service.bulkDelete(rest.map(a => a.id)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+          next: () => {
+            const removedIds = new Set([best.id, ...rest.map(a => a.id)]);
+            this.articles.update(list => list.filter(a => !removedIds.has(a.id)));
+          },
+          error: () => this.error.set('Failed to archive rest of cluster'),
+        });
+      },
+      error: () => this.error.set('Failed to save best article'),
+    });
   }
 
   // Snooze

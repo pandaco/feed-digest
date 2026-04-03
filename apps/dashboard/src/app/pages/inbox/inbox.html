@@ -187,7 +187,71 @@
       </div>
     </section>
 
+    <!-- View mode toggle -->
+    <div class="view-toggle">
+      <button class="view-toggle-btn" [class.active]="viewMode() === 'list'" (click)="viewMode.set('list')">List</button>
+      <button class="view-toggle-btn" [class.active]="viewMode() === 'clusters'" (click)="viewMode.set('clusters')">
+        Clusters
+        @if (clusters().length > 0) {
+          <span class="cluster-count">({{ clusters().length }})</span>
+        }
+      </button>
+    </div>
+
+    <!-- Cluster view -->
+    @if (viewMode() === 'clusters') {
+      <section class="clusters-section">
+        @if (clusters().length === 0) {
+          <div class="empty-state">No clusters found (articles need to share at least 2 tags).</div>
+        }
+        @for (cluster of clusters(); track cluster.id) {
+          <div class="cluster-card">
+            <div class="cluster-header" role="button" tabindex="0" (click)="toggleClusterExpand(cluster.id)" (keydown.enter)="toggleClusterExpand(cluster.id)" (keydown.space)="toggleClusterExpand(cluster.id); $event.preventDefault()">
+              <span class="cluster-toggle">{{ isClusterExpanded(cluster.id) ? '\u25BC' : '\u25B6' }}</span>
+              <span class="cluster-label">{{ cluster.label }}</span>
+              <span class="cluster-article-count">{{ cluster.articles.length }} articles</span>
+              <div class="cluster-tags">
+                @for (tag of cluster.sharedTags; track tag) {
+                  <span class="badge badge-tag">{{ tag }}</span>
+                }
+              </div>
+            </div>
+            @if (isClusterExpanded(cluster.id)) {
+              <div class="cluster-body">
+                <div class="cluster-actions">
+                  <button class="btn btn-sm btn-primary" (click)="saveBestArchiveRest(cluster); $event.stopPropagation()">
+                    Save best + archive rest
+                  </button>
+                  <button class="btn btn-sm" (click)="synthesizeCluster(cluster); $event.stopPropagation()" [disabled]="synthesizingCluster() === cluster.id" style="border: 1px solid #e2e8f0;">
+                    {{ synthesizingCluster() === cluster.id ? 'Synthesizing...' : 'Synthesize' }}
+                  </button>
+                </div>
+                @if (clusterSynthesis()[cluster.id]) {
+                  <div class="cluster-synthesis" [innerHTML]="clusterSynthesis()[cluster.id]"></div>
+                }
+                <ul class="cluster-articles">
+                  @for (article of cluster.articles; track article.id) {
+                    <li>
+                      <a [href]="article.url" target="_blank" rel="noopener">{{ article.title }}</a>
+                      <span class="article-source">{{ article.feedSource }}</span>
+                      @if (article.relevanceScore) {
+                        <span class="score-badge" [class.score-high]="article.relevanceScore >= 7" [class.score-low]="article.relevanceScore <= 3">{{ article.relevanceScore }}</span>
+                      }
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        }
+        @if (unclusteredArticles().length > 0) {
+          <div class="unclustered-label">{{ unclusteredArticles().length }} unclustered article{{ unclusteredArticles().length !== 1 ? 's' : '' }}</div>
+        }
+      </section>
+    }
+
     <!-- Table -->
+    @if (viewMode() === 'list') {
     <section class="table-section">
       <div class="table-header">
         <div class="filter-tabs" role="tablist" aria-label="Filter by importance">
@@ -472,5 +536,6 @@
         </div>
       }
     </section>
+    }
   }
 </div>

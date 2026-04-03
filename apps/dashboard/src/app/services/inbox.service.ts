@@ -55,6 +55,13 @@ export class InboxService {
     );
   }
 
+  synthesize(articleIds: string[]): Observable<{ html: string }> {
+    return this.http.post<{ html: string }>(
+      `${this.apiBase}/synthesize`,
+      { articleIds },
+    );
+  }
+
   snoozeArticle(articleId: string, snoozedUntil: string): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(
       `${this.apiBase}/${articleId}/snooze`,
