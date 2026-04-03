@@ -48,15 +48,31 @@ export function applyStructuralFilters(articles: Article[], filters: StructuralF
   return result;
 }
 
+function searchScore(article: Article, q: string): number {
+  let score = 0;
+  if (article.title.toLowerCase().includes(q)) score += 3;
+  if (article.tags.some(t => t.toLowerCase().includes(q))) score += 2;
+  if (article.summary.toLowerCase().includes(q)) score += 1;
+  return score;
+}
+
 export function searchAndSort(articles: Article[], query: string, field: SortField, direction: SortDirection): Article[] {
   let result = articles;
 
   const q = query.toLowerCase().trim();
   if (q) {
-    result = result.filter(a =>
-      a.title.toLowerCase().includes(q) ||
-      a.summary.toLowerCase().includes(q)
-    );
+    result = result.filter(a => searchScore(a, q) > 0);
+
+    // When searching, sort by relevance first, then by selected field
+    const dir = direction === 'asc' ? 1 : -1;
+    return [...result].sort((a, b) => {
+      const scoreDiff = searchScore(b, q) - searchScore(a, q);
+      if (scoreDiff !== 0) return scoreDiff;
+      if (field === 'importance') {
+        return ((IMPORTANCE_RANK[a.importance] || 0) - (IMPORTANCE_RANK[b.importance] || 0)) * dir;
+      }
+      return (a[field] < b[field] ? -1 : a[field] > b[field] ? 1 : 0) * dir;
+    });
   }
 
   const dir = direction === 'asc' ? 1 : -1;
