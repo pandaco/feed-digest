@@ -38,10 +38,27 @@
         <button class="btn btn-sm" (click)="toggleContent()" [disabled]="fullContentLoading()" style="border: 1px solid #e2e8f0;">
           {{ fullContentLoading() ? 'Loading...' : (showFullContent() ? 'Show summary' : 'Show full article') }}
         </button>
+        <button class="btn btn-sm" (click)="toggleToc()" [disabled]="tocLoading()" style="border: 1px solid #e2e8f0;">
+          {{ tocLoading() ? 'Loading...' : (showToc() ? 'Hide structure' : 'Structure') }}
+        </button>
         <a [href]="a.url" target="_blank" rel="noopener" class="btn btn-sm btn-primary">
           Open original
         </a>
       </div>
+
+      @if (showToc()) {
+        <aside class="toc-panel">
+          <h3 class="toc-title">Table of Contents</h3>
+          @if (toc().length === 0 && !tocLoading()) {
+            <p class="toc-empty">No headings found in this article.</p>
+          }
+          <nav class="toc-nav">
+            @for (entry of toc(); track entry.text) {
+              <div [class]="'toc-entry toc-level-' + entry.level">{{ entry.text }}</div>
+            }
+          </nav>
+        </aside>
+      }
 
       <div class="reader-body">
         @if (showFullContent() && fullContent()) {

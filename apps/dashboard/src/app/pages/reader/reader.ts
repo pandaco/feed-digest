@@ -28,6 +28,11 @@ export class ReaderComponent {
   fullContentLoading = signal(false);
   fullContentWordCount = signal(0);
 
+  // Table of Contents
+  toc = signal<{ level: 2 | 3; text: string }[]>([]);
+  tocLoading = signal(false);
+  showToc = signal(false);
+
   readingTime = computed(() => {
     if (this.showFullContent() && this.fullContent()) {
       return estimateReadingTime(this.fullContent().replace(/<[^>]*>/g, ' '));
@@ -91,6 +96,30 @@ export class ReaderComponent {
       error: () => {
         this.error.set('Failed to load full content');
         this.fullContentLoading.set(false);
+      },
+    });
+  }
+
+  toggleToc(): void {
+    if (!this.showToc() && this.toc().length === 0) {
+      this.loadToc();
+    }
+    this.showToc.update(v => !v);
+  }
+
+  private loadToc(): void {
+    const a = this.article();
+    if (!a) return;
+
+    this.tocLoading.set(true);
+
+    this.inboxService.getArticleToc(a.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (res) => {
+        this.toc.set(res.toc);
+        this.tocLoading.set(false);
+      },
+      error: () => {
+        this.tocLoading.set(false);
       },
     });
   }

@@ -84,6 +84,10 @@ export class InboxService {
     return this.http.get<{ content: string; wordCount: number }>(`/api/articles/${articleId}/content`);
   }
 
+  getArticleToc(articleId: string): Observable<{ toc: { level: 2 | 3; text: string }[] }> {
+    return this.http.get<{ toc: { level: 2 | 3; text: string }[] }>(`/api/articles/${articleId}/toc`);
+  }
+
   getInterests(): Observable<{ text: string }> {
     return this.http.get<{ text: string }>('/api/interests');
   }

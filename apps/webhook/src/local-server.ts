@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { FileSessionAdapter, TelegramAdapter, createStorage, createTagPreference, createLlm } from '@feed-digest/adapters';
 import { handleCallback } from '@feed-digest/pipeline';
-import { normalizeTag } from '@feed-digest/core';
+import { normalizeTag, extractToc, TocEntry } from '@feed-digest/core';
 
 dotenv.config();
 
@@ -342,8 +342,41 @@ async function startPolling() {
     }
   });
 
-  // --- Article Content API ---
+  // --- Article TOC & Content API ---
+  const tocCache = new Map<string, TocEntry[]>();
   const contentCache = new Map<string, { content: string; wordCount: number }>();
+
+  app.get('/api/articles/:articleId/toc', async (req, res) => {
+    const articleId = req.params['articleId'];
+
+    if (tocCache.has(articleId)) {
+      res.json({ toc: tocCache.get(articleId) });
+      return;
+    }
+
+    try {
+      const [inbox, saved] = await Promise.all([storage.getFromInbox(), storage.getFromSaved()]);
+      const article = [...inbox, ...saved].find(a => a.id === articleId);
+      if (!article) {
+        res.status(404).json({ error: 'Article not found' });
+        return;
+      }
+
+      const response = await fetch(article.url);
+      if (!response.ok) {
+        res.json({ toc: [] });
+        return;
+      }
+
+      const html = await response.text();
+      const toc = extractToc(html);
+      tocCache.set(articleId, toc);
+      res.json({ toc });
+    } catch (error) {
+      console.error('[API] Failed to extract TOC:', error);
+      res.status(500).json({ error: 'Failed to extract table of contents' });
+    }
+  });
 
   app.get('/api/articles/:articleId/content', async (req, res) => {
     const articleId = req.params['articleId'];

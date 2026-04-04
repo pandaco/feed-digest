@@ -96,6 +96,50 @@
   margin-bottom: 2rem;
 }
 
+.toc-panel {
+  padding: 16px;
+  margin-bottom: 2rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  background: var(--bg-hover, #f8fafc);
+}
+
+.toc-title {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.toc-empty {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+  margin: 0;
+}
+
+.toc-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toc-entry {
+  font-size: 0.9rem;
+  padding: 4px 0;
+  color: var(--text-primary, #1e293b);
+  border-left: 2px solid transparent;
+  padding-left: 8px;
+
+  &:hover {
+    color: var(--color-primary, #6366f1);
+  }
+}
+
+.toc-level-3 {
+  padding-left: 24px;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+}
+
 .reader-body {
   font-size: 1.05rem;
   color: var(--text-primary, #1e293b);
