@@ -473,7 +473,10 @@
                 <td colspan="7">
                   <div class="detail-content">
                     <div class="detail-summary">
-                      <h3>Summary</h3>
+                      <div class="detail-summary-header">
+                        <h3>Summary</h3>
+                        <a [routerLink]="['/reader', article.id, 'inbox']" class="btn btn-sm btn-primary">Read</a>
+                      </div>
                       <p>{{ article.summary }}</p>
                     </div>
                     <div class="detail-meta">

@@ -17,3 +17,9 @@ export function formatDate(iso?: string): string {
 export function formatScore(score: number): string {
   return `${Math.round(score * 100)}%`;
 }
+
+export function estimateReadingTime(text: string): string {
+  const words = text.split(/\s+/).filter(w => w.length > 0).length;
+  const minutes = Math.max(1, Math.ceil(words / 200));
+  return `${minutes} min read`;
+}

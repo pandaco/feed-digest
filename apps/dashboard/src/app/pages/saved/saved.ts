@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed, effect, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { SavedService } from '../../services/saved.service';
 import { Article } from '../../services/inbox.service';
 import { formatDate } from '../../shared/format';
@@ -11,7 +12,7 @@ import {
 
 @Component({
   selector: 'app-saved',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './saved.html',
   styleUrl: './saved.scss',
 })

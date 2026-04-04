@@ -376,6 +376,17 @@
   color: var(--text-primary);
 }
 
+.detail-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  h3 {
+    margin: 0;
+  }
+}
+
 .meta-mono {
   font-family: monospace;
   font-size: 0.75rem;

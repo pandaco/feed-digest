@@ -342,6 +342,43 @@ async function startPolling() {
     }
   });
 
+  // --- Article Content API ---
+  const contentCache = new Map<string, { content: string; wordCount: number }>();
+
+  app.get('/api/articles/:articleId/content', async (req, res) => {
+    const articleId = req.params['articleId'];
+
+    if (contentCache.has(articleId)) {
+      res.json(contentCache.get(articleId));
+      return;
+    }
+
+    try {
+      // Find article URL across inbox and saved
+      const [inbox, saved] = await Promise.all([storage.getFromInbox(), storage.getFromSaved()]);
+      const article = [...inbox, ...saved].find(a => a.id === articleId);
+      if (!article) {
+        res.status(404).json({ error: 'Article not found' });
+        return;
+      }
+
+      const response = await fetch(article.url);
+      if (!response.ok) {
+        res.json({ content: article.summary, wordCount: article.summary.split(/\s+/).length });
+        return;
+      }
+
+      const html = await response.text();
+      const wordCount = html.replace(/<[^>]*>/g, ' ').split(/\s+/).filter(Boolean).length;
+      const result = { content: html, wordCount };
+      contentCache.set(articleId, result);
+      res.json(result);
+    } catch (error) {
+      console.error('[API] Failed to fetch article content:', error);
+      res.status(500).json({ error: 'Failed to fetch article content' });
+    }
+  });
+
   app.listen(port, () => {
     console.log(`[API] Dashboard API running on http://localhost:${port}`);
   });

@@ -1,0 +1,55 @@
+<div class="reader-container">
+  <nav class="reader-nav">
+    <a [routerLink]="'/' + source()" class="back-link">&larr; Back to {{ source() }}</a>
+  </nav>
+
+  @if (loading()) {
+    <div class="reader-loading">Loading article...</div>
+  }
+
+  @if (error()) {
+    <div class="alert alert-error">{{ error() }}</div>
+  }
+
+  @if (article(); as a) {
+    <article class="reader-article">
+      <header class="reader-header">
+        <h1 class="reader-title">{{ a.title }}</h1>
+        <div class="reader-meta">
+          <span class="reader-source">{{ a.feedSource }}</span>
+          <span class="reader-date">{{ formatDate(a.publishedAt) }}</span>
+          @if (readingTime()) {
+            <span class="reader-time">{{ readingTime() }}</span>
+          }
+          @if (a.relevanceScore) {
+            <span class="reader-score" [class.score-high]="a.relevanceScore >= 7" [class.score-low]="a.relevanceScore <= 3">
+              Score: {{ a.relevanceScore }}/10
+            </span>
+          }
+        </div>
+        <div class="reader-tags">
+          @for (tag of a.tags; track tag) {
+            <span class="badge badge-tag">{{ tag }}</span>
+          }
+        </div>
+      </header>
+
+      <div class="reader-controls">
+        <button class="btn btn-sm" (click)="toggleContent()" [disabled]="fullContentLoading()" style="border: 1px solid #e2e8f0;">
+          {{ fullContentLoading() ? 'Loading...' : (showFullContent() ? 'Show summary' : 'Show full article') }}
+        </button>
+        <a [href]="a.url" target="_blank" rel="noopener" class="btn btn-sm btn-primary">
+          Open original
+        </a>
+      </div>
+
+      <div class="reader-body">
+        @if (showFullContent() && fullContent()) {
+          <div class="reader-content" [innerHTML]="fullContent()"></div>
+        } @else {
+          <p class="reader-summary">{{ a.summary }}</p>
+        }
+      </div>
+    </article>
+  }
+</div>

@@ -80,6 +80,10 @@ export class InboxService {
     return this.http.get<Article[]>(`${this.apiBase}/snoozed`);
   }
 
+  getArticleContent(articleId: string): Observable<{ content: string; wordCount: number }> {
+    return this.http.get<{ content: string; wordCount: number }>(`/api/articles/${articleId}/content`);
+  }
+
   getInterests(): Observable<{ text: string }> {
     return this.http.get<{ text: string }>('/api/interests');
   }
