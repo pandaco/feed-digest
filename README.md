@@ -66,16 +66,18 @@ npm run fix-dates
 | `DYNAMODB_TAG_PREF_TABLE_NAME` | DynamoDB table for tag preferences (prod) | - |
 | `TAG_PREFERENCE_THRESHOLD` | Score above which a tag is auto-selected | `0.6` |
 | `TAG_PREFERENCE_MIN_RUNS` | Minimum presentations before auto-selection | `3` |
+| `USER_INTERESTS` | Free-text interest profile for LLM relevance scoring | - |
+| `API_PORT` | Port for the local dashboard API server | `3333` |
 
 ## Pipeline flow
 
 1. **Scraping**: collects articles from InoReader — unread (`inoreader`) or starred (`inoreader-saved`) depending on `SCRAPER_SOURCE` (FIFO, max 150)
 2. **Content fetching**: fetches each article's source page, extracts full text via Readability and the real publication date from HTML meta tags / JSON-LD
-3. **Enrichment**: summary and tags via LLM. Importance is **not** determined by the LLM — it is computed from your tag preferences:
+3. **Enrichment**: summary, tags, and relevance score via LLM. The LLM also computes a `relevanceScore` (1-10) based on the user's interest profile (`USER_INTERESTS`). Importance is **not** determined by the LLM — it is computed from your tag preferences:
    - Tag with `auto` override or high selection score → **high**
    - All tags `filtered` → **low**
    - Otherwise → **medium**
-4. **Storage**: all articles go to Inbox + All (Google Sheets or Notion depending on `STORAGE_BACKEND`). For `inoreader-saved`, processed articles are unstarred on InoReader.
+4. **Storage**: all articles go to Inbox + All (Google Sheets or Notion depending on `STORAGE_BACKEND`). For `inoreader-saved`, processed articles are unstarred on InoReader. Articles also store `relevanceScore` and optional `snoozedUntil` fields.
 5. **Telegram notification** (4+1 messages):
    - Run summary (stats, duration)
    - Statistics by RSS source
@@ -87,11 +89,14 @@ npm run fix-dates
 
 ## Dashboard
 
-The Angular dashboard (`apps/dashboard`) provides four views:
+The Angular dashboard (`apps/dashboard`) provides eight views:
 
-- **Inbox**: browse, filter, and bulk-manage articles. Includes temporal histogram (day/week/month/year), top tags and sources charts, AI summary generation with period options, advanced filters (scraper source, tags), and keyboard shortcuts (`?` to list them).
+- **Inbox**: browse, filter, and bulk-manage articles. Includes temporal histogram (day/week/month/year), top tags and sources charts, AI summary generation with period options, advanced filters (scraper source, tags), keyboard shortcuts (`?` to list them), tag-based clustering with synthesis, snooze presets, and relevance score display. Search covers title, summary, and tags with relevance scoring.
 - **Triage**: single-article-at-a-time quick processing — Save, Pass, or Skip with keyboard shortcuts.
 - **Saved**: browse and manage saved articles with the same filtering capabilities.
 - **Tag Preferences**: view and override tag auto-selection behavior.
+- **Snoozed**: view and manage snoozed articles, unsnooze on demand.
+- **Interests**: edit your interest profile (free text), used by the LLM for relevance scoring.
+- **Reader** (Focus Mode): clean reading view with 70ch max-width typography, summary/full content toggle, reading time estimate, table of contents panel, and score display. Accessible via "Read" buttons on inbox and saved articles.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for the full development guide.

@@ -54,6 +54,8 @@ Fill in the following variables in `.env`:
 - `DYNAMODB_TAG_PREF_TABLE_NAME` (optional for local, see below)
 - `TAG_PREFERENCE_THRESHOLD` (default: `0.6` — minimum score for auto-selection)
 - `TAG_PREFERENCE_MIN_RUNS` (default: `3` — minimum presentations before auto-selection kicks in)
+- `USER_INTERESTS` (free-text interest profile for LLM relevance scoring, also editable via dashboard)
+- `API_PORT` (default: `3333` — port for the local Express API server)
 
 ---
 
@@ -137,6 +139,8 @@ Create 3 Notion databases (Inbox, All, Saved) with the following properties:
 | LLM Provider | Rich text |
 | Summary Language | Rich text |
 | Scraper Source | Rich text |
+| Snoozed Until | Rich text |
+| Relevance Score | Number |
 
 ### 4.3 Share the databases
 For each database, click **"..."** > **"Connections"** > add your integration.
@@ -190,16 +194,19 @@ The app will be available at `http://localhost:4200`.
 ### Features
 
 **Inbox**
-- Browse all articles in inbox with title, source, tags, importance, and publication date
+- Browse all articles in inbox with title, source, tags, importance, relevance score, and publication date
 - Expand any article to view its full summary and metadata
-- Filter by importance level, source, tags (multi-select), and free-text search (title + summary)
-- Sort by published date, run date, or importance
+- Filter by importance level, source, tags (multi-select), and free-text search (title + summary + tags with relevance scoring)
+- Sort by published date, run date, importance, or relevance score
 - Bulk selection (per-article or select-all visible) with bulk delete and bulk save
 - Save articles individually or in bulk (moves from inbox to saved)
 - Stats overview: article counts by importance, top sources
 - Top 10 tags histogram
 - AI-generated HTML summary of the entire inbox (via LLM)
 - Tags colored by preference state (auto = green, filtered = red, default = purple)
+- Tag-based clustering: toggle between list and cluster view, collapsible groups, "Save best + archive rest" batch action, cluster synthesis via LLM
+- Snooze articles with presets (ce soir, demain matin, ce weekend, dans 1 semaine)
+- "Read" button to open articles in focus mode reader view
 
 **Saved Articles**
 - Browse all saved/starred articles with the same filtering and sorting as inbox
@@ -207,6 +214,7 @@ The app will be available at `http://localhost:4200`.
 - Filter by importance, source, tags, and free-text search
 - Bulk selection with bulk remove
 - Expandable detail rows with full summary and metadata
+- "Read" button to open articles in focus mode reader view
 
 **Tag Preferences**
 - View all tracked tags with their selection scores (progress bars)
@@ -215,6 +223,24 @@ The app will be available at `http://localhost:4200`.
 - Change tag state (auto / default / filtered) directly from the table
 - See stats: run count, tag counts by state, average selection rate, threshold
 - Reset all preferences for a chat ID
+
+**Snoozed**
+- View all currently snoozed articles with their snooze expiry date
+- Unsnooze articles on demand (returns them to inbox)
+
+**Interests**
+- Edit your interest profile as free text (e.g. "web development, AI, security, open source")
+- Word count display
+- Profile is stored as `.user-interests.txt` and injected into the LLM enrich prompt for relevance scoring
+
+**Reader (Focus Mode)**
+- Clean reading view accessible via `/reader/:articleId/:source`
+- 70ch max-width typography, optimized line height
+- Toggle between article summary and full original content (fetched on demand)
+- Reading time estimate based on word count
+- Table of contents panel (extracted from article HTML headings)
+- Relevance score and tags display
+- Direct link to original article
 
 ### API Endpoints
 The dashboard connects to the webhook Lambda's REST API:
@@ -229,9 +255,17 @@ The dashboard connects to the webhook Lambda's REST API:
 | `POST` | `/api/inbox/bulk-delete` | Delete multiple articles (`{ "articleIds": [...] }`) |
 | `POST` | `/api/inbox/save` | Save articles (move from inbox to saved) (`{ "articleIds": [...] }`) |
 | `POST` | `/api/inbox/summary` | Generate an AI summary of all inbox articles (HTML) |
+| `POST` | `/api/inbox/synthesize` | Synthesize selected articles via LLM (`{ "articleIds": [...] }`) |
+| `POST` | `/api/inbox/:articleId/snooze` | Snooze an article (`{ "snoozedUntil": "ISO date" }`) |
+| `POST` | `/api/inbox/:articleId/unsnooze` | Unsnooze an article |
+| `GET` | `/api/inbox/snoozed` | List all snoozed articles |
 | `GET` | `/api/saved` | List all saved articles |
 | `DELETE` | `/api/saved/:articleId` | Remove a single article from saved |
 | `POST` | `/api/saved/bulk-delete` | Remove multiple articles from saved (`{ "articleIds": [...] }`) |
+| `GET` | `/api/interests` | Get user interest profile (text) |
+| `POST` | `/api/interests` | Save user interest profile (`{ "text": "..." }`) |
+| `GET` | `/api/articles/:articleId/content` | Fetch full article content (HTML + word count) |
+| `GET` | `/api/articles/:articleId/toc` | Extract table of contents (h2/h3 headings) |
 
 All API calls require the `x-telegram-bot-api-secret-token` header.
 
@@ -284,5 +318,5 @@ Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployme
   - `tag-preference/dynamodb-tag-preference.adapter.ts` / `tag-preference/file-tag-preference.adapter.ts` — Tag preference learning
 - **libs/pipeline**: Orchestration (the "Glue") between the ports.
 - **apps/scraper**: CLI entry point (composition root).
-- **apps/webhook**: AWS Lambda handler for Telegram callbacks + REST API (preferences, inbox, saved).
-- **apps/dashboard**: Angular web UI: inbox browser, saved articles, tag preference management.
+- **apps/webhook**: AWS Lambda handler for Telegram callbacks + REST API (preferences, inbox, saved, snooze, interests, article content/TOC).
+- **apps/dashboard**: Angular web UI: inbox browser (with clustering, snooze, relevance scores), saved articles, triage, tag preferences, snoozed articles, user interests, focus mode reader.

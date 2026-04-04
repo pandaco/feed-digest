@@ -1,3 +1,14 @@
+## Unreleased
+
+### 🚀 Features
+
+- **dashboard:** enhance search with tag matching and relevance scoring ([133acad](https://github.com/pandaco/feed-digest/commit/133acad))
+- **core:** add article snooze with presets and dedicated page ([a1ad0ea](https://github.com/pandaco/feed-digest/commit/a1ad0ea))
+- **core:** add LLM relevance scoring with user interest profile ([c086879](https://github.com/pandaco/feed-digest/commit/c086879))
+- **dashboard:** add tag-based article clustering with synthesis ([8b36a56](https://github.com/pandaco/feed-digest/commit/8b36a56))
+- **dashboard:** add focus mode reader view with clean typography ([a61966c](https://github.com/pandaco/feed-digest/commit/a61966c))
+- **core:** add table of contents extraction for long articles ([bde1007](https://github.com/pandaco/feed-digest/commit/bde1007))
+
 ## 0.2.0 (2026-04-02)
 
 ### 🚀 Features

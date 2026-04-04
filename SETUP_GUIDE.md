@@ -97,3 +97,5 @@ The **Chat ID** is the unique number of *your* account. This allows the bot to k
 | `DYNAMODB_TAG_PREF_TABLE_NAME` | AWS DynamoDB table name | `feed-digest-tag-prefs` |
 | `TAG_PREFERENCE_THRESHOLD` | Auto-selection score threshold | `0.6` |
 | `TAG_PREFERENCE_MIN_RUNS` | Minimum runs before auto-selection | `3` |
+| `USER_INTERESTS` | Free-text interest profile for relevance scoring | `web dev, AI, security` |
+| `API_PORT` | Local dashboard API port | `3333` |
