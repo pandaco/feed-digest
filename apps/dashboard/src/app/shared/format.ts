@@ -1,5 +1,11 @@
 const DEFAULT_DATE_FORMAT = 'yyyy-MM-dd HH:mm';
 
+let activeDateFormat = DEFAULT_DATE_FORMAT;
+
+export function setDateFormat(fmt: string): void {
+  activeDateFormat = fmt || DEFAULT_DATE_FORMAT;
+}
+
 function applyDateFormat(d: Date, fmt: string): string {
   const yyyy = String(d.getFullYear());
   const MM   = String(d.getMonth() + 1).padStart(2, '0');
@@ -18,8 +24,7 @@ export function formatDate(iso?: string): string {
   if (!iso) return '-';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '-';
-  const fmt = (typeof localStorage !== 'undefined' && localStorage.getItem('DATE_FORMAT')) || DEFAULT_DATE_FORMAT;
-  return applyDateFormat(d, fmt);
+  return applyDateFormat(d, activeDateFormat);
 }
 
 export function formatScore(score: number): string {

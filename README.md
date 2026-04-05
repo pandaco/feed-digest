@@ -71,6 +71,7 @@ npm run fix-dates
 | `TAG_PREFERENCE_MIN_RUNS` | Minimum presentations before auto-selection | `3` |
 | `USER_INTERESTS` | Free-text interest profile for LLM relevance scoring | - |
 | `API_PORT` | Port for the local dashboard API server | `3333` |
+| `DATE_FORMAT` | Date display format in the dashboard (tokens: `yyyy`, `MM`, `dd`, `HH`, `mm`) | `yyyy-MM-dd HH:mm` |
 
 ## Pipeline flow
 

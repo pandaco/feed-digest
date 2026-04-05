@@ -71,6 +71,12 @@ async function startPolling() {
     next();
   });
 
+  app.get('/api/config', (_req, res) => {
+    res.json({
+      dateFormat: process.env['DATE_FORMAT'] || 'yyyy-MM-dd HH:mm',
+    });
+  });
+
   app.use('/api', (req, res, next) => {
     const headerToken = req.headers['x-telegram-bot-api-secret-token'];
     if (secretToken && headerToken !== secretToken) {
