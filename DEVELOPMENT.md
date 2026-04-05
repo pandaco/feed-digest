@@ -301,8 +301,21 @@ Add these secrets to your GitHub Repository:
 - `NOTION_API_KEY` / `NOTION_INBOX_DB_ID` / `NOTION_ALL_DB_ID` / `NOTION_SAVED_DB_ID` (if Notion)
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`
 
+### 6.3 GitHub Variables
+Add these variables (Settings > Secrets and variables > Actions > Variables):
+- `LLM_PROVIDER` — `claude` or `gemini`
+- `SUMMARY_LANG` — `fr` or `en`
+- `ARTICLES_LIMIT` — max articles per run (default: `150`)
+- `MAX_TAGS` — max tags per article (default: `3`)
+- `PIPELINE_CONCURRENCY` — parallel enrichments (default: `5`)
+- `PIPELINE_MIN_DELAY_MS` / `PIPELINE_MAX_DELAY_MS` — rate-limit jitter
+- `SCRAPER_SOURCE` — `inoreader`, `inoreader-saved`, or both
+- `STORAGE_BACKEND` — `google-sheets` or `notion`
+- `TAG_PREFERENCE_THRESHOLD` / `TAG_PREFERENCE_MIN_RUNS` — auto-selection tuning
+- `USER_INTERESTS` — free-text interest profile for LLM relevance scoring
+
 ### 6.3 Deployment
-Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployment, and the `scraper` workflow will run twice daily.
+Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployment, and the `scraper` workflow will run five times daily (07h, 10h, 13h, 16h, 19h Paris time — with both winter/summer UTC variants).
 
 ---
 

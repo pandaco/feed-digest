@@ -8,6 +8,14 @@
 - **dashboard:** add tag-based article clustering with synthesis ([8b36a56](https://github.com/pandaco/feed-digest/commit/8b36a56))
 - **dashboard:** add focus mode reader view with clean typography ([a61966c](https://github.com/pandaco/feed-digest/commit/a61966c))
 - **core:** add table of contents extraction for long articles ([bde1007](https://github.com/pandaco/feed-digest/commit/bde1007))
+- **core:** add LLM usage tracking (calls + tokens) and rich Telegram notification with pipeline funnel, importance, relevance, top sources ([91b61ee](https://github.com/pandaco/feed-digest/commit/91b61ee))
+- **dashboard:** enhance cluster view with per-article dates, checkboxes, bulk save/delete, recursive splitting for large clusters, refresh button, and consistent page layouts ([c7f0823](https://github.com/pandaco/feed-digest/commit/c7f0823))
+- **ci:** upgrade GitHub Actions to v5 and add 5 daily scraper schedules (07h, 10h, 13h, 16h, 19h Paris) ([10b17f0](https://github.com/pandaco/feed-digest/commit/10b17f0))
+
+### 🔧 Improvements
+
+- **pipeline:** remove summarizeRun LLM call and interactive Telegram features to save tokens
+- **dashboard:** remove confirm() dialogs from inbox and saved pages for faster triaging
 
 ## 0.2.0 (2026-04-02)
 

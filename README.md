@@ -78,20 +78,14 @@ npm run fix-dates
    - All tags `filtered` → **low**
    - Otherwise → **medium**
 4. **Storage**: all articles go to Inbox + All (Google Sheets or Notion depending on `STORAGE_BACKEND`). For `inoreader-saved`, processed articles are unstarred on InoReader. Articles also store `relevanceScore` and optional `snoozedUntil` fields.
-5. **Telegram notification** (4+1 messages):
-   - Run summary (stats, duration)
-   - Statistics by RSS source
-   - AI synthesis of trends
-   - Interactive tag selection (inline buttons, with learned favorites pre-checked; filtered tags are hidden)
-   - List of saved articles (if applicable)
-6. **Filtering**: user selects tags to keep via Telegram
-7. **Preference learning**: tag selections are recorded to auto-select favorites in future runs. Tags can also be manually overridden to `auto` (always pre-selected) or `filtered` (hidden from notifications) via the dashboard.
+5. **Telegram notification**: a single rich summary message with pipeline funnel (collected → deduped → noise-filtered → processed), importance breakdown (high/medium/low), average relevance score, top 5 sources, LLM usage (calls + tokens in/out), and run duration.
+6. **Preference learning**: tag preferences are learned from dashboard interactions. Tags can be manually overridden to `auto` (always pre-selected) or `filtered` (hidden) via the dashboard.
 
 ## Dashboard
 
 The Angular dashboard (`apps/dashboard`) provides eight views:
 
-- **Inbox**: browse, filter, and bulk-manage articles. Includes temporal histogram (day/week/month/year), top tags and sources charts, AI summary generation with period options, advanced filters (scraper source, tags), keyboard shortcuts (`?` to list them), tag-based clustering with synthesis, snooze presets, and relevance score display. Search covers title, summary, and tags with relevance scoring.
+- **Inbox**: browse, filter, and bulk-manage articles. Includes temporal histogram (day/week/month/year), top tags and sources charts, AI summary generation with period options, advanced filters (scraper source, tags), keyboard shortcuts (`?` to list them), tag-based clustering with per-article dates, checkboxes, bulk save/delete per cluster, recursive splitting for large clusters, cluster stats toolbar with refresh, snooze presets, and relevance score display. Search covers title, summary, and tags with relevance scoring.
 - **Triage**: single-article-at-a-time quick processing — Save, Pass, or Skip with keyboard shortcuts.
 - **Saved**: browse and manage saved articles with the same filtering capabilities.
 - **Tag Preferences**: view and override tag auto-selection behavior.
