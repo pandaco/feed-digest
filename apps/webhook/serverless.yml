@@ -17,6 +17,10 @@ provider:
     NOTION_ALL_DB_ID: ${ssm:/feed-digest/${self:provider.stage}/NOTION_ALL_DB_ID, ""}
     NOTION_SAVED_DB_ID: ${ssm:/feed-digest/${self:provider.stage}/NOTION_SAVED_DB_ID, ""}
     DYNAMODB_TABLE_NAME: !Ref SessionsTable
+    DYNAMODB_ARTICLES_TABLE_NAME: !Ref ArticlesTable
+    DYNAMODB_TAG_PREF_TABLE_NAME: !Ref TagPrefsTable
+    STORAGE_BACKEND: ${ssm:/feed-digest/${self:provider.stage}/STORAGE_BACKEND, "google-sheets"}
+    USER_INTERESTS: ${ssm:/feed-digest/${self:provider.stage}/USER_INTERESTS, ""}
     SUMMARY_LANG: ${ssm:/feed-digest/${self:provider.stage}/SUMMARY_LANG}
   iam:
     role:
@@ -27,6 +31,24 @@ provider:
             - dynamodb:PutItem
             - dynamodb:DeleteItem
           Resource: !GetAtt SessionsTable.Arn
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:BatchWriteItem
+            - dynamodb:Query
+          Resource:
+            - !GetAtt ArticlesTable.Arn
+            - !Sub "${ArticlesTable.Arn}/index/GSI1"
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:DeleteItem
+            - dynamodb:Scan
+          Resource: !GetAtt TagPrefsTable.Arn
 
 functions:
   webhook:
@@ -53,3 +75,44 @@ resources:
         TimeToLiveSpecification:
           AttributeName: ttl
           Enabled: true
+
+    ArticlesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: feed-digest-articles-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+          - AttributeName: GSI1PK
+            AttributeType: S
+          - AttributeName: GSI1SK
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1
+            KeySchema:
+              - AttributeName: GSI1PK
+                KeyType: HASH
+              - AttributeName: GSI1SK
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    TagPrefsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: feed-digest-tag-prefs-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: tag
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tag
+            KeyType: HASH

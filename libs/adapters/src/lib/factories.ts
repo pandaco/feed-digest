@@ -1,6 +1,7 @@
 import { LlmPort, StoragePort, SessionPort, TagPreferencePort } from '@feed-digest/core';
 import { GoogleSheetsAdapter } from './storage/google-sheets.adapter';
 import { NotionAdapter } from './storage/notion.adapter';
+import { DynamoDbStorageAdapter } from './storage/dynamodb-storage.adapter';
 import { ClaudeAdapter } from './llm/claude.adapter';
 import { GeminiAdapter } from './llm/gemini.adapter';
 import { DynamoDbAdapter } from './session/dynamodb.adapter';
@@ -23,8 +24,14 @@ export function createStorage(label = 'App'): StoragePort {
         allDatabaseId: process.env['NOTION_ALL_DB_ID']!,
         savedDatabaseId: process.env['NOTION_SAVED_DB_ID']!,
       });
+    case 'dynamodb':
+      return new DynamoDbStorageAdapter({
+        region: process.env['AWS_REGION'] || 'eu-west-1',
+        tableName: process.env['DYNAMODB_ARTICLES_TABLE_NAME']!,
+        endpoint: process.env['DYNAMODB_ENDPOINT'],
+      });
     default:
-      throw new Error(`[${label}] Unknown STORAGE_BACKEND: "${backend}". Supported: google-sheets, notion`);
+      throw new Error(`[${label}] Unknown STORAGE_BACKEND: "${backend}". Supported: google-sheets, notion, dynamodb`);
   }
 }
 
