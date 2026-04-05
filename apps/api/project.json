@@ -1,0 +1,44 @@
+{
+  "name": "api",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/api/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/api"],
+      "defaultConfiguration": "production",
+      "options": {
+        "command": "npx tsc -p apps/api/tsconfig.app.json --outDir dist/apps/api"
+      },
+      "configurations": {
+        "development": {},
+        "production": {}
+      }
+    },
+    "build-local": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/api-local"],
+      "defaultConfiguration": "development",
+      "options": {
+        "command": "npx tsc -p apps/api/tsconfig.app.json --outDir dist/apps/api-local"
+      },
+      "configurations": {
+        "development": {},
+        "production": {}
+      }
+    },
+    "serve": {
+      "continuous": true,
+      "executor": "nx:run-commands",
+      "defaultConfiguration": "development",
+      "options": {
+        "command": "npx tsx watch --tsconfig tsconfig.base.json apps/api/src/main.ts"
+      }
+    }
+  }
+}

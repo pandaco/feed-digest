@@ -16,7 +16,7 @@ libs/adapters/      Concrete implementations
   tag-preference/   DynamoDbTagPreferenceAdapter, FileTagPreferenceAdapter
 libs/pipeline/      Pipeline orchestration
 apps/scraper/       CLI entry point (composition root)
-apps/webhook/       AWS Lambda: tag preferences API for the dashboard
+apps/api/           NestJS API server — local dashboard backend + AWS Lambda handler
 apps/dashboard/     Angular web UI: inbox, triage, saved articles, tag preferences
 ```
 
@@ -38,7 +38,7 @@ npm run setup
 npm run scraper
 
 # Run the local API server (dashboard backend)
-npm run webhook
+npm run api
 
 # Fix publication dates (re-fetch real dates from source URLs)
 npm run fix-dates

@@ -6,7 +6,7 @@
     "build": "npx nx run-many -t build",
     "lint": "npx nx run-many -t lint",
     "test": "npx nx run-many -t test",
-    "webhook": "npx nx serve webhook",
+    "api": "npx nx serve api",
     "scraper": "RUN_NOW=true npx nx serve scraper",
     "recover": "npx tsx --tsconfig tsconfig.base.json apps/scraper/src/recover.ts",
     "fix-dates": "npx nx fix-dates scraper",
@@ -72,6 +72,9 @@
     "@aws-sdk/lib-dynamodb": "^3.1009.0",
     "@google/generative-ai": "^0.24.1",
     "@mozilla/readability": "^0.6.0",
+    "@nestjs/common": "^11.1.18",
+    "@nestjs/core": "^11.1.18",
+    "@nestjs/platform-express": "^11.1.18",
     "@notionhq/client": "^5.14.0",
     "chromium": "^3.0.3",
     "concurrently": "^9.2.1",
@@ -82,6 +85,8 @@
     "node-telegram-bot-api": "^0.67.0",
     "p-limit": "^7.3.0",
     "playwright-core": "^1.58.2",
-    "rxjs": "~7.8.0"
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "~7.8.0",
+    "serverless-http": "^4.0.0"
   }
 }

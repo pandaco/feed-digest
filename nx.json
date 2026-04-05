@@ -77,7 +77,7 @@
   "release": {
     "projects": [
       "scraper",
-      "webhook"
+      "api"
     ],
     "projectsRelationship": "fixed",
     "version": {

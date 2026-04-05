@@ -43,13 +43,13 @@ provider:
           Resource: !GetAtt TagPrefsTable.Arn
 
 functions:
-  webhook:
-    handler: main.handler
+  api:
+    handler: apps/api/src/lambda.handler
     timeout: 29
     events:
       - httpApi:
-          path: /webhook
-          method: POST
+          path: /{proxy+}
+          method: ANY
 
 resources:
   Resources:
