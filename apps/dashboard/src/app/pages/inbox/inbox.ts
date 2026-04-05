@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect, DestroyRef, HostListener, SecurityContext } from '@angular/core';
+import { Component, inject, signal, computed, effect, DestroyRef, HostListener, SecurityContext, afterNextRender } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
@@ -89,6 +89,16 @@ export class InboxComponent {
       }
     }, { allowSignalWrites: true });
 
+    afterNextRender(() => {
+      const el = document.querySelector('.timeline-chart') as HTMLElement | null;
+      if (!el) return;
+      const obs = new ResizeObserver(entries => {
+        if (entries[0]) this.chartContainerWidth.set(entries[0].contentRect.width);
+      });
+      obs.observe(el);
+      this.destroyRef.onDestroy(() => obs.disconnect());
+    });
+
     this.loadInbox();
   }
 
@@ -114,8 +124,11 @@ export class InboxComponent {
   showHelp = signal(false);
   focusedIndex = signal(-1);
   currentPage = signal(1);
-  timeGranularity = signal<TimeGranularity>('day');
+  timeGranularity = signal<TimeGranularity>('week');
   timeFilter = signal<{ start: string; end: string } | null>(null);
+  chartContainerWidth = signal(800);
+
+  private readonly MIN_BAR_PX = 48;
 
   // Tag preference states
   tagStates = signal<Record<string, string>>({});
@@ -229,6 +242,18 @@ export class InboxComponent {
     const b = this.timeBuckets();
     return b.length > 0 ? Math.max(...b.map(x => x.count)) : 1;
   });
+
+  maxVisibleBuckets = computed(() =>
+    Math.max(6, Math.floor(this.chartContainerWidth() / this.MIN_BAR_PX))
+  );
+
+  visibleTimeBuckets = computed(() => {
+    const all = this.timeBuckets();
+    const max = this.maxVisibleBuckets();
+    return all.length > max ? all.slice(all.length - max) : all;
+  });
+
+  hasHiddenBuckets = computed(() => this.timeBuckets().length > this.maxVisibleBuckets());
 
   // Structural filters — only recalculates when filter toggles change, not on search keystrokes
   private structuralFiltered = computed(() =>
@@ -492,6 +517,25 @@ export class InboxComponent {
     this.error.set(null);
 
     this.service.generateSummary(period).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (res) => {
+        this.summaryHtml.set(this.sanitizer.sanitize(SecurityContext.HTML, res.html) || '');
+        this.summaryLoading.set(false);
+      },
+      error: () => {
+        this.error.set('Failed to generate summary');
+        this.summaryLoading.set(false);
+      },
+    });
+  }
+
+  generateSummaryFiltered(): void {
+    const ids = this.filteredArticles().map(a => a.id);
+    if (ids.length === 0) return;
+
+    this.summaryLoading.set(true);
+    this.error.set(null);
+
+    this.service.synthesize(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res) => {
         this.summaryHtml.set(this.sanitizer.sanitize(SecurityContext.HTML, res.html) || '');
         this.summaryLoading.set(false);

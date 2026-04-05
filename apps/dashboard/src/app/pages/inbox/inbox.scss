@@ -104,8 +104,22 @@ kbd {
   display: flex;
   align-items: flex-end;
   gap: 2px;
-  height: 120px;
-  padding-top: 0.5rem;
+  height: 140px;
+  padding-top: 1.2rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+
+  &::-webkit-scrollbar { height: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+}
+
+.timeline-truncated {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin: 0 0 0.25rem;
 }
 
 .timeline-bar-wrapper {
@@ -116,7 +130,6 @@ kbd {
   justify-content: flex-end;
   height: 100%;
   cursor: pointer;
-  min-width: 0;
   position: relative;
 
   &:hover .timeline-bar { background: var(--primary-muted); }

@@ -92,6 +92,15 @@
       <button class="btn btn-sm" (click)="generateSummary()" [disabled]="summaryLoading()" style="border: 1px solid #e2e8f0;">
         All
       </button>
+      <button
+        class="btn btn-sm btn-filtered-summary"
+        (click)="generateSummaryFiltered()"
+        [disabled]="summaryLoading() || filteredArticles().length === 0"
+        [title]="'Summarize the ' + filteredArticles().length + ' currently filtered articles'"
+        style="border: 1px solid #e2e8f0;"
+      >
+        Filtered ({{ filteredArticles().length }})
+      </button>
       @if (summaryLoading()) {
         <span class="summary-loading">Generating...</span>
       }
@@ -182,8 +191,11 @@
           <button class="granularity-tab" [class.active]="timeGranularity() === 'year'" (click)="timeGranularity.set('year')">Year</button>
         </div>
       </div>
+      @if (hasHiddenBuckets()) {
+        <p class="timeline-truncated">Showing the last {{ visibleTimeBuckets().length }} {{ timeGranularity() }}s</p>
+      }
       <div class="timeline-chart" role="group" aria-label="Timeline histogram">
-        @for (bucket of timeBuckets(); track bucket.label) {
+        @for (bucket of visibleTimeBuckets(); track bucket.label) {
           <div
             class="timeline-bar-wrapper"
             role="button"
