@@ -41,9 +41,13 @@ Fill in the following variables in `.env`:
 - If `STORAGE_BACKEND=google-sheets`:
   - `GOOGLE_SERVICE_ACCOUNT_JSON` (the full JSON string)
   - `GOOGLE_SHEET_ID`
+  - Run `npm run setup` to create the tabs and headers automatically
+- If `STORAGE_BACKEND=notion`:
+  - Run `npm run setup` to create all required properties in the 3 databases
 - If `STORAGE_BACKEND=notion`:
   - `NOTION_API_KEY`
   - `NOTION_INBOX_DB_ID`, `NOTION_ALL_DB_ID`, `NOTION_SAVED_DB_ID`
+  - Run `npm run setup` to provision the Notion database schema
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 - `SCRAPER_SOURCE` (comma-separated: `inoreader` for unread, `inoreader-saved` for starred, e.g. `inoreader,inoreader-saved`)
@@ -121,8 +125,14 @@ If you use `STORAGE_BACKEND=notion`:
 1. Go to https://www.notion.so/my-integrations
 2. Create a new integration and copy the API key (`NOTION_API_KEY`)
 
-### 4.2 Create the 3 databases
-Create 3 Notion databases (Inbox, All, Saved) with the following properties:
+### 4.2 Create the 3 databases and provision the schema
+Create 3 empty Notion databases (Inbox, All, Saved), share each one with your integration, set the 3 IDs in `.env`, then run:
+```bash
+npm run setup
+```
+This creates all required properties automatically. You can also run it on an existing database to add missing columns without affecting existing data.
+
+Required properties (created by `npm run setup`):
 
 | Property | Notion Type |
 |----------|-------------|
@@ -142,7 +152,7 @@ Create 3 Notion databases (Inbox, All, Saved) with the following properties:
 | Snoozed Until | Rich text |
 | Relevance Score | Number |
 
-### 4.3 Share the databases
+### 4.3 Share the databases and set IDs
 For each database, click **"..."** > **"Connections"** > add your integration.
 
 ### 4.4 Retrieve the IDs

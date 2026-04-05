@@ -32,6 +32,9 @@ npx playwright install chromium
 cp .env.example .env
 # Fill in the .env file
 
+# Set up storage backend schema (Notion or Google Sheets based on STORAGE_BACKEND)
+npm run setup
+
 # Run the pipeline (bypass time window)
 npm run scraper
 
