@@ -52,26 +52,32 @@ async function setupNotionDatabase(apiKey: string, databaseId: string, label: st
   console.log(`\n[setup] Fetching Notion schema for ${label} (${databaseId})...`);
 
   const db = await notionFetch(`databases/${databaseId}`, 'GET', apiKey);
-  const existing = new Set(Object.keys(db.properties ?? {}));
+  const existingProps = db.properties ?? {};
 
-  const toCreate: Record<string, any> = {};
+  const toUpdate: Record<string, any> = {};
   for (const [name, def] of Object.entries(NOTION_REQUIRED_PROPERTIES)) {
-    if (existing.has(name)) {
-      console.log(`  ✅ "${name}" already exists`);
+    const existing = existingProps[name];
+    const expectedType = Object.keys(def)[0];
+
+    if (!existing) {
+      console.log(`  ➕ "${name}" will be created (${expectedType})`);
+      toUpdate[name] = def;
+    } else if (existing.type !== expectedType) {
+      console.log(`  ⚠️  "${name}" exists as "${existing.type}" but expected "${expectedType}" — will update`);
+      toUpdate[name] = def;
     } else {
-      console.log(`  ➕ "${name}" will be created`);
-      toCreate[name] = def;
+      console.log(`  ✅ "${name}" (${expectedType})`);
     }
   }
 
-  if (Object.keys(toCreate).length === 0) {
+  if (Object.keys(toUpdate).length === 0) {
     console.log(`  → Nothing to do for ${label}.`);
     return;
   }
 
-  await notionFetch(`databases/${databaseId}`, 'PATCH', apiKey, { properties: toCreate });
-  const count = Object.keys(toCreate).length;
-  console.log(`  ✓ ${label} updated with ${count} new propert${count === 1 ? 'y' : 'ies'}.`);
+  await notionFetch(`databases/${databaseId}`, 'PATCH', apiKey, { properties: toUpdate });
+  const count = Object.keys(toUpdate).length;
+  console.log(`  ✓ ${label} updated (${count} propert${count === 1 ? 'y' : 'ies'} created/fixed).`);
 }
 
 async function setupNotion(): Promise<void> {
@@ -143,15 +149,15 @@ async function setupGoogleSheets(): Promise<void> {
       });
       console.log(`  ✓ Headers written.`);
     } else if (missingCols.length > 0) {
-      console.log(`\n[setup] Tab "${tab}" — appending ${missingCols.length} missing column(s): ${missingCols.join(', ')}`);
-      const nextCol = String.fromCharCode(65 + firstRow.length);
+      // Rewrite the full header row in the correct order (adapter reads by index)
+      console.log(`\n[setup] Tab "${tab}" — missing column(s): ${missingCols.join(', ')} — rewriting header row in correct order`);
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${tab}!${nextCol}1`,
+        range: `${tab}!A1`,
         valueInputOption: 'RAW',
-        requestBody: { values: [missingCols] },
+        requestBody: { values: [SHEETS_HEADERS] },
       });
-      console.log(`  ✓ Columns added.`);
+      console.log(`  ✓ Header row updated.`);
     } else {
       console.log(`\n[setup] Tab "${tab}" — all columns present ✅`);
     }
