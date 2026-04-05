@@ -10,6 +10,7 @@
     "scraper": "RUN_NOW=true npx nx serve scraper",
     "recover": "npx tsx --tsconfig tsconfig.base.json apps/scraper/src/recover.ts",
     "fix-dates": "npx nx fix-dates scraper",
+    "setup-notion": "npx tsx --tsconfig tsconfig.base.json apps/scraper/src/setup-notion.ts",
     "release": "npx nx release",
     "release:dry-run": "npx nx release --dry-run"
   },
