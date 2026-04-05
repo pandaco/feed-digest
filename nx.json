@@ -90,7 +90,11 @@
           "authors": false
         }
       },
-      "projectChangelogs": true
+      "projectChangelogs": {
+        "renderOptions": {
+          "authors": false
+        }
+      }
     },
     "git": {
       "commit": true,
