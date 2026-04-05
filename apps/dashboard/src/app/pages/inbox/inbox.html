@@ -278,7 +278,7 @@
                         [checked]="isSelected(article.id)"
                         (change)="toggleSelect(article.id)"
                       />
-                      <span class="cluster-article-date">[{{ article.publishedAt | date:'yyyy-MM-dd' }}]</span>
+                      <span class="cluster-article-date">[{{ formatDate(article.publishedAt) }}]</span>
                       <a [href]="article.url" target="_blank" rel="noopener">{{ article.title }}</a>
                       <span class="article-source">{{ article.feedSource }}</span>
                       @if (article.relevanceScore) {

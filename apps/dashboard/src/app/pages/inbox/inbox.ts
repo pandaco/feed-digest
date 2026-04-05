@@ -2,7 +2,6 @@ import { Component, inject, signal, computed, effect, DestroyRef, HostListener, 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
-import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { InboxService, Article } from '../../services/inbox.service';
 import { TagPreferenceService } from '../../services/tag-preference.service';
@@ -25,7 +24,7 @@ const IMPORTANCE_TOOLTIP: Record<string, string> = {
 
 @Component({
   selector: 'app-inbox',
-  imports: [FormsModule, RouterLink, DatePipe],
+  imports: [FormsModule, RouterLink],
   templateUrl: './inbox.html',
   styleUrl: './inbox.scss',
 })

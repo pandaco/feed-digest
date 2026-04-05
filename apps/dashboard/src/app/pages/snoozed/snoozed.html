@@ -59,7 +59,7 @@
               }
             </td>
             <td class="col-snooze">
-              <span class="snooze-date" [title]="article.snoozedUntil || ''">{{ formatSnoozeDate(article.snoozedUntil || '') }}</span>
+              <span class="snooze-date">{{ formatDate(article.snoozedUntil) }}</span>
             </td>
             <td class="col-actions">
               <button class="btn-icon" title="Unsnooze" (click)="unsnooze(article)" [disabled]="isUnsnoozing(article.id)">
