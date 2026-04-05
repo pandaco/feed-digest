@@ -51,16 +51,65 @@ export class TelegramAdapter implements NotifierPort {
 
   async sendRunSummary(summary: RunSummary): Promise<void> {
     const i18n = this.messages[summary.summaryLanguage] || this.messages['fr'];
+    const isFr = summary.summaryLanguage === 'fr';
     const title = summary.runLabel === 'morning' ? i18n.morning : i18n.evening;
 
     let message = `<b>${title} — ${summary.date}</b>\n\n`;
-    message += `${i18n.processed} : ${summary.articlesProcessed} articles\n`;
-    message += `${summary.articlesRemaining} ${i18n.remaining}\n`;
-    message += `${i18n.llm} : ${summary.llmProvider} / ${i18n.lang} : ${summary.summaryLanguage}\n`;
-    if (summary.durationMs) {
-      message += `${i18n.duration} : ${this.formatDuration(summary.durationMs)}\n`;
+
+    // Pipeline funnel
+    if (summary.articlesCollected) {
+      message += `📥 ${isFr ? 'Collectés' : 'Collected'} : ${summary.articlesCollected}\n`;
+      if (summary.duplicatesRemoved) {
+        message += `🔁 ${isFr ? 'Doublons retirés' : 'Duplicates removed'} : ${summary.duplicatesRemoved}\n`;
+      }
+      if (summary.noiseFiltered) {
+        message += `🗑 ${isFr ? 'Bruit filtré' : 'Noise filtered'} : ${summary.noiseFiltered}\n`;
+      }
     }
-    message += `${i18n.tagsIdentified} : ${Object.keys(summary.tagCounts).length}`;
+    message += `✅ ${i18n.processed} : ${summary.articlesProcessed} articles\n`;
+    if (summary.failedCount) {
+      message += `❌ ${isFr ? 'Échoués' : 'Failed'} : ${summary.failedCount}\n`;
+    }
+    message += `📋 ${summary.articlesRemaining} ${i18n.remaining}\n`;
+    message += '\n';
+
+    // Importance breakdown
+    if (summary.importanceCounts) {
+      const ic = summary.importanceCounts;
+      message += `<b>${isFr ? 'Importance' : 'Importance'}</b>\n`;
+      message += `🔴 High : ${ic.high}  🟡 Medium : ${ic.medium}  🟢 Low : ${ic.low}\n`;
+    }
+
+    // Relevance score
+    if (summary.averageRelevanceScore !== undefined) {
+      message += `📊 ${isFr ? 'Score moyen de pertinence' : 'Avg relevance score'} : ${summary.averageRelevanceScore}/10\n`;
+    }
+    message += '\n';
+
+    // Top sources
+    if (summary.topSources && summary.topSources.length > 0) {
+      message += `<b>${isFr ? 'Top sources' : 'Top sources'}</b>\n`;
+      for (const src of summary.topSources) {
+        message += `  ${src.name} : ${src.count}\n`;
+      }
+      message += '\n';
+    }
+
+    // LLM usage
+    if (summary.llmCalls) {
+      const totalTokens = (summary.llmInputTokens ?? 0) + (summary.llmOutputTokens ?? 0);
+      message += `<b>LLM (${summary.llmProvider})</b>\n`;
+      message += `  ${isFr ? 'Appels' : 'Calls'} : ${summary.llmCalls}\n`;
+      message += `  Tokens : ${this.formatNumber(totalTokens)} (in: ${this.formatNumber(summary.llmInputTokens ?? 0)} / out: ${this.formatNumber(summary.llmOutputTokens ?? 0)})\n`;
+      message += '\n';
+    }
+
+    // Meta
+    message += `${i18n.lang} : ${summary.summaryLanguage}\n`;
+    if (summary.durationMs) {
+      message += `⏱ ${i18n.duration} : ${this.formatDuration(summary.durationMs)}\n`;
+    }
+    message += `🏷 ${i18n.tagsIdentified} : ${Object.keys(summary.tagCounts).length}`;
 
     await this.bot.sendMessage(this.chatId, message, { parse_mode: 'HTML' });
   }
@@ -225,6 +274,12 @@ export class TelegramAdapter implements NotifierPort {
     keyboard.push([{ text: `🚀 ${validateLabel}`, callback_data: 'validate' }]);
 
     return keyboard;
+  }
+
+  private formatNumber(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+    return n.toString();
   }
 
   private formatDuration(ms: number): string {

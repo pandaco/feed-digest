@@ -1,14 +1,28 @@
-import { GoogleGenerativeAI, GenerationConfig } from '@google/generative-ai';
-import { Article, LlmPort, EnrichInput, EnrichOutput, normalizeTags } from '@feed-digest/core';
+import { GoogleGenerativeAI, GenerationConfig, GenerateContentResult } from '@google/generative-ai';
+import { Article, LlmPort, LlmUsage, EnrichInput, EnrichOutput, normalizeTags } from '@feed-digest/core';
 import { cleanHtml } from './clean-html';
 
 export class GeminiAdapter implements LlmPort {
   private genAI: GoogleGenerativeAI;
   private readonly modelName: string;
+  private usage: LlmUsage = { calls: 0, inputTokens: 0, outputTokens: 0 };
 
   constructor(apiKey: string, model = 'gemini-1.5-flash') {
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.modelName = model;
+  }
+
+  getUsage(): LlmUsage {
+    return { ...this.usage };
+  }
+
+  private trackUsage(result: GenerateContentResult): void {
+    this.usage.calls++;
+    const meta = result.response.usageMetadata;
+    if (meta) {
+      this.usage.inputTokens += meta.promptTokenCount ?? 0;
+      this.usage.outputTokens += meta.candidatesTokenCount ?? 0;
+    }
   }
 
   async enrich(input: EnrichInput): Promise<EnrichOutput> {
@@ -54,6 +68,7 @@ export class GeminiAdapter implements LlmPort {
         })
       );
 
+      this.trackUsage(result);
       const response = result.response;
       const content = response.text();
       return this.parseResponse(content, input.title);
@@ -79,6 +94,7 @@ export class GeminiAdapter implements LlmPort {
         model.generateContent(userPrompt)
       );
       
+      this.trackUsage(result);
       return result.response.text();
     } catch (error) {
       console.error('[GeminiAdapter] Failed to summarize run:', error);
@@ -113,6 +129,7 @@ ${items}`;
         model.generateContent(userPrompt)
       );
 
+      this.trackUsage(result);
       return cleanHtml(result.response.text());
     } catch (error) {
       console.error('[GeminiAdapter] Failed to summarize inbox:', error);

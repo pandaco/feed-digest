@@ -233,21 +233,49 @@ export async function buildNotificationData(options: BuildNotificationDataOption
   return { tagCounts: visibleTagCounts, sourceCounts, sessionTags, articleCache, savedArticles, tagOrder, preSelected, preSelectedCount, filteredTags };
 }
 
+interface RunStats {
+  articlesCollected: number;
+  duplicatesRemoved: number;
+  noiseFiltered: number;
+  failedCount: number;
+  llmCalls: number;
+  llmInputTokens: number;
+  llmOutputTokens: number;
+}
+
 async function sendNotifications(
   options: RunPipelineOptions,
   articles: Article[],
   remaining: number,
   runAtDate: Date,
-  runSynthesis: string | null,
+  stats: RunStats,
 ) {
-  const { tagCounts, sourceCounts, savedArticles, tagOrder, sessionTags, articleCache, preSelected, preSelectedCount } =
-    await buildNotificationData({
-      articles,
-      tagPreference: options.tagPreference,
-      chatId: options.telegramChatId,
-    });
+  const sourceCounts: Record<string, number> = {};
+  const tagCounts: Record<string, number> = {};
+  for (const a of articles) {
+    sourceCounts[a.feedSource] = (sourceCounts[a.feedSource] || 0) + 1;
+    for (const t of a.tags) {
+      tagCounts[t] = (tagCounts[t] || 0) + 1;
+    }
+  }
 
   const runLabel = new Date().getHours() < 12 ? 'morning' : 'evening';
+
+  const importanceCounts = { high: 0, medium: 0, low: 0 };
+  let totalScore = 0;
+  let scoreCount = 0;
+  for (const a of articles) {
+    importanceCounts[a.importance]++;
+    if (a.relevanceScore) {
+      totalScore += a.relevanceScore;
+      scoreCount++;
+    }
+  }
+
+  const topSources = Object.entries(sourceCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, count]) => ({ name, count }));
 
   await options.notifier.sendRunSummary({
     runLabel,
@@ -258,37 +286,16 @@ async function sendNotifications(
     llmProvider: options.llmProvider,
     summaryLanguage: options.summaryLang,
     durationMs: Date.now() - runAtDate.getTime(),
-  });
-
-  await options.notifier.sendSourceStats(sourceCounts, options.summaryLang);
-
-  if (runSynthesis) {
-    await options.notifier.sendSynthesis(runSynthesis, options.summaryLang);
-  }
-
-  const hasPreSelected = Object.keys(preSelected).length > 0;
-  const messageId = await options.notifier.sendTagSelection(
-    tagCounts,
-    options.summaryLang,
-    hasPreSelected ? preSelected : undefined,
-  );
-
-  if (preSelectedCount > 0) {
-    console.log(`[Pipeline] Pre-selected ${preSelectedCount} tags based on learned preferences`);
-  }
-
-  if (savedArticles.length > 0) {
-    await options.notifier.sendSavedArticles(savedArticles, options.summaryLang);
-  }
-
-  await options.session.save({
-    chatId: options.telegramChatId,
-    messageId,
-    runAt: runAtDate.toISOString(),
-    tags: sessionTags,
-    tagOrder,
-    articles: articleCache,
-    ttl: Math.floor(Date.now() / 1000) + 43200,
+    articlesCollected: stats.articlesCollected,
+    duplicatesRemoved: stats.duplicatesRemoved,
+    noiseFiltered: stats.noiseFiltered,
+    failedCount: stats.failedCount,
+    importanceCounts,
+    averageRelevanceScore: scoreCount > 0 ? Math.round((totalScore / scoreCount) * 10) / 10 : undefined,
+    topSources,
+    llmCalls: stats.llmCalls,
+    llmInputTokens: stats.llmInputTokens,
+    llmOutputTokens: stats.llmOutputTokens,
   });
 }
 
@@ -362,10 +369,19 @@ export async function runPipeline(options: RunPipelineOptions): Promise<void> {
     })));
 
     const enrichedArticles = results.filter((a): a is Article => a !== undefined);
-    console.log(`[Pipeline] Finished processing. (Saved: ${enrichedArticles.length}, Failed: ${metadata.length - enrichedArticles.length})`);
+    const failedCount = metadata.length - enrichedArticles.length;
+    console.log(`[Pipeline] Finished processing. (Saved: ${enrichedArticles.length}, Failed: ${failedCount})`);
 
-    const runSynthesis = await options.llm.summarizeRun(enrichedArticles, languageName);
-    await sendNotifications(options, enrichedArticles, remaining, runAtDate, runSynthesis);
+    const llmUsage = options.llm.getUsage();
+    await sendNotifications(options, enrichedArticles, remaining, runAtDate, {
+      articlesCollected: rawMetadata.length,
+      duplicatesRemoved: duplicates.length,
+      noiseFiltered: noise.length,
+      failedCount,
+      llmCalls: llmUsage.calls,
+      llmInputTokens: llmUsage.inputTokens,
+      llmOutputTokens: llmUsage.outputTokens,
+    });
 
     console.log('[Pipeline] Run completed successfully.');
   } catch (error) {

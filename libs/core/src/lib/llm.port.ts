@@ -30,10 +30,21 @@ export interface EnrichOutput {
 }
 
 /**
+ * Cumulative LLM usage stats for a pipeline run.
+ */
+export interface LlmUsage {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/**
  * Port for the Large Language Model (LLM) processing.
  * This interface isolates the domain from specific AI providers like Anthropic or Google.
  */
 export interface LlmPort {
+  /** Returns cumulative usage stats since adapter creation. */
+  getUsage(): LlmUsage;
   /**
    * Enriches a single article with a summary, tags, and importance level.
    * 

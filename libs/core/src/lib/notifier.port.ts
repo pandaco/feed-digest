@@ -18,6 +18,26 @@ export interface RunSummary {
   summaryLanguage: string;
   /** Duration of the run in milliseconds */
   durationMs?: number;
+  /** Number of articles collected before dedup/noise filtering */
+  articlesCollected?: number;
+  /** Number of duplicates removed */
+  duplicatesRemoved?: number;
+  /** Number of noise articles filtered */
+  noiseFiltered?: number;
+  /** Number of articles that failed enrichment */
+  failedCount?: number;
+  /** Importance breakdown */
+  importanceCounts?: { high: number; medium: number; low: number };
+  /** Average relevance score (1-10) */
+  averageRelevanceScore?: number;
+  /** Top sources with counts (sorted desc) */
+  topSources?: { name: string; count: number }[];
+  /** Number of LLM API calls made */
+  llmCalls?: number;
+  /** Total input tokens consumed */
+  llmInputTokens?: number;
+  /** Total output tokens consumed */
+  llmOutputTokens?: number;
 }
 
 /**

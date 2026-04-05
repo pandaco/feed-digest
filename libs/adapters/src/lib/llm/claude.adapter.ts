@@ -1,14 +1,25 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { Article, LlmPort, EnrichInput, EnrichOutput, normalizeTags } from '@feed-digest/core';
+import { Article, LlmPort, LlmUsage, EnrichInput, EnrichOutput, normalizeTags } from '@feed-digest/core';
 import { cleanHtml } from './clean-html';
 
 export class ClaudeAdapter implements LlmPort {
   private client: Anthropic;
   private readonly model: string;
+  private usage: LlmUsage = { calls: 0, inputTokens: 0, outputTokens: 0 };
 
   constructor(apiKey: string, model = 'claude-3-5-sonnet-20240620') {
     this.client = new Anthropic({ apiKey });
     this.model = model;
+  }
+
+  getUsage(): LlmUsage {
+    return { ...this.usage };
+  }
+
+  private trackUsage(response: Anthropic.Message): void {
+    this.usage.calls++;
+    this.usage.inputTokens += response.usage?.input_tokens ?? 0;
+    this.usage.outputTokens += response.usage?.output_tokens ?? 0;
   }
 
   async enrich(input: EnrichInput): Promise<EnrichOutput> {
@@ -45,6 +56,7 @@ export class ClaudeAdapter implements LlmPort {
           messages: [{ role: 'user', content: userPrompt }],
         })
       );
+      this.trackUsage(response);
 
       const content = response.content[0].type === 'text' ? response.content[0].text : '';
       return this.parseResponse(content, input.title);
@@ -71,6 +83,7 @@ export class ClaudeAdapter implements LlmPort {
           messages: [{ role: 'user', content: userPrompt }],
         })
       );
+      this.trackUsage(response);
 
       return response.content[0].type === 'text' ? response.content[0].text : '';
     } catch (error) {
@@ -109,6 +122,7 @@ ${items}`;
         })
       );
 
+      this.trackUsage(response);
       const text = response.content[0].type === 'text' ? response.content[0].text : '';
       return cleanHtml(text);
     } catch (error) {
