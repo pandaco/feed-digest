@@ -110,8 +110,18 @@
         </div>
         <div class="histogram">
           @for (tag of topTags(); track tag.name) {
-            <div class="histogram-row">
-              <span class="histogram-label" [title]="tag.name">{{ tag.name }}</span>
+            <div
+              class="histogram-row histogram-row-clickable"
+              [class.histogram-row-active]="isTagSelected(tag.name)"
+              role="button"
+              tabindex="0"
+              [attr.aria-pressed]="isTagSelected(tag.name)"
+              [title]="(isTagSelected(tag.name) ? 'Remove filter: ' : 'Filter by tag: ') + tag.name"
+              (click)="toggleTag(tag.name)"
+              (keydown.enter)="toggleTag(tag.name)"
+              (keydown.space)="toggleTag(tag.name); $event.preventDefault()"
+            >
+              <span class="histogram-label">{{ tag.name }}</span>
               <div class="histogram-bar-container">
                 <div
                   class="histogram-bar"
@@ -131,8 +141,18 @@
         </div>
         <div class="histogram">
           @for (source of topSourcesList(); track source.name) {
-            <div class="histogram-row">
-              <span class="histogram-label" [title]="source.name">{{ source.name }}</span>
+            <div
+              class="histogram-row histogram-row-clickable"
+              [class.histogram-row-active]="isSourceSelected(source.name)"
+              role="button"
+              tabindex="0"
+              [attr.aria-pressed]="isSourceSelected(source.name)"
+              [title]="(isSourceSelected(source.name) ? 'Remove filter: ' : 'Filter by source: ') + source.name"
+              (click)="toggleSource(source.name)"
+              (keydown.enter)="toggleSource(source.name)"
+              (keydown.space)="toggleSource(source.name); $event.preventDefault()"
+            >
+              <span class="histogram-label">{{ source.name }}</span>
               <div class="histogram-bar-container">
                 <div
                   class="histogram-bar histogram-bar-source"
