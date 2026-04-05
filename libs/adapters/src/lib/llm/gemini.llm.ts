@@ -2,7 +2,7 @@ import { GoogleGenerativeAI, GenerationConfig, GenerateContentResult } from '@go
 import { Article, LlmPort, LlmUsage, EnrichInput, EnrichOutput, normalizeTags } from '@feed-digest/core';
 import { cleanHtml } from './clean-html';
 
-export class GeminiAdapter implements LlmPort {
+export class GeminiLlm implements LlmPort {
   private genAI: GoogleGenerativeAI;
   private readonly modelName: string;
   private usage: LlmUsage = { calls: 0, inputTokens: 0, outputTokens: 0 };
@@ -73,7 +73,7 @@ export class GeminiAdapter implements LlmPort {
       const content = response.text();
       return this.parseResponse(content, input.title);
     } catch (error) {
-      console.error('[GeminiAdapter] Failed to enrich article:', error);
+      console.error('[GeminiLlm] Failed to enrich article:', error);
       return this.fallback(input.title);
     }
   }
@@ -97,7 +97,7 @@ export class GeminiAdapter implements LlmPort {
       this.trackUsage(result);
       return result.response.text();
     } catch (error) {
-      console.error('[GeminiAdapter] Failed to summarize run:', error);
+      console.error('[GeminiLlm] Failed to summarize run:', error);
       return `Global run summary (automated summary failed).`;
     }
   }
@@ -132,7 +132,7 @@ ${items}`;
       this.trackUsage(result);
       return cleanHtml(result.response.text());
     } catch (error) {
-      console.error('[GeminiAdapter] Failed to summarize inbox:', error);
+      console.error('[GeminiLlm] Failed to summarize inbox:', error);
       return '<p>Summary generation failed.</p>';
     }
   }
@@ -145,7 +145,7 @@ ${items}`;
       const score = typeof parsed.relevanceScore === 'number' ? Math.max(1, Math.min(10, Math.round(parsed.relevanceScore))) : 5;
       return { ...parsed, tags: normalizeTags(parsed.tags ?? []), relevanceScore: score };
     } catch {
-      console.warn('[GeminiAdapter] JSON parsing failed for response:', content);
+      console.warn('[GeminiLlm] JSON parsing failed for response:', content);
       return this.fallback(title);
     }
   }
@@ -166,7 +166,7 @@ ${items}`;
       const isRetryable = error.message?.includes('429') || error.message?.includes('500');
       
       if (retries > 0 && isRetryable) {
-        console.warn(`[GeminiAdapter] Retry attempt ${4 - retries} after ${delay}ms due to: ${error.message}`);
+        console.warn(`[GeminiLlm] Retry attempt ${4 - retries} after ${delay}ms due to: ${error.message}`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         return this.withRetry(fn, retries - 1, delay * 2);
       }

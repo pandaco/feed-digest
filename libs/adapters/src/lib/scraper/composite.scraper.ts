@@ -4,7 +4,7 @@ import { ScraperPort, CollectResult, ArticleMetadata, FetchContentResult } from 
  * Wraps multiple scrapers and merges their results.
  * Collects from each source sequentially, deduplicates by URL.
  */
-export class CompositeScraperAdapter implements ScraperPort {
+export class CompositeScraper implements ScraperPort {
   constructor(private scrapers: ScraperPort[]) {}
 
   async collect(limit: number): Promise<CollectResult> {

@@ -1,7 +1,7 @@
 import { google, sheets_v4 } from 'googleapis';
 import { Article, StoragePort } from '@feed-digest/core';
 
-export class GoogleSheetsAdapter implements StoragePort {
+export class GoogleSheetsStorage implements StoragePort {
   private sheets: sheets_v4.Sheets;
   private spreadsheetId: string;
   private tabsChecked = false;
@@ -29,7 +29,7 @@ export class GoogleSheetsAdapter implements StoragePort {
     // 1. Create missing tabs
     const missingTabs = requiredTabs.filter((tab) => !existingTabs.includes(tab));
     if (missingTabs.length > 0) {
-      console.log(`[GoogleSheetsAdapter] Creating missing tabs: ${missingTabs.join(', ')}`);
+      console.log(`[GoogleSheetsStorage] Creating missing tabs: ${missingTabs.join(', ')}`);
       await this.sheets.spreadsheets.batchUpdate({
         spreadsheetId: this.spreadsheetId,
         requestBody: {
@@ -49,7 +49,7 @@ export class GoogleSheetsAdapter implements StoragePort {
 
       const hasContent = response.data.values && response.data.values.length > 0;
       if (!hasContent) {
-        console.log(`[GoogleSheetsAdapter] Tab "${tab}" is empty. Writing headers...`);
+        console.log(`[GoogleSheetsStorage] Tab "${tab}" is empty. Writing headers...`);
         const headers = [
           'ID', 'Run At', 'Published At', 'Source', 'Title', 'URL', 'Tags',
           'Summary', 'Importance', 'Content Unavailable', 'LLM Provider', 'Summary Language',
@@ -69,24 +69,24 @@ export class GoogleSheetsAdapter implements StoragePort {
       valueInputOption: 'RAW',
       requestBody: { values: [headers] },
     });
-    console.log(`[GoogleSheetsAdapter] Headers written to tab: ${tab}`);
+    console.log(`[GoogleSheetsStorage] Headers written to tab: ${tab}`);
   }
 
   async appendToInbox(articles: Article[]): Promise<void> {
     await this.ensureTabsAndHeaders();
-    console.log(`[GoogleSheetsAdapter] Attempting to append ${articles.length} articles to Inbox...`);
+    console.log(`[GoogleSheetsStorage] Attempting to append ${articles.length} articles to Inbox...`);
     await this.appendArticles('Inbox', articles);
   }
 
   async appendToAll(articles: Article[]): Promise<void> {
     await this.ensureTabsAndHeaders();
-    console.log(`[GoogleSheetsAdapter] Attempting to append ${articles.length} articles to All...`);
+    console.log(`[GoogleSheetsStorage] Attempting to append ${articles.length} articles to All...`);
     await this.appendArticles('All', articles);
   }
 
   async appendToSaved(articles: Article[]): Promise<void> {
     await this.ensureTabsAndHeaders();
-    console.log(`[GoogleSheetsAdapter] Attempting to append ${articles.length} articles to Saved...`);
+    console.log(`[GoogleSheetsStorage] Attempting to append ${articles.length} articles to Saved...`);
     await this.appendArticles('Saved', articles);
   }
 
@@ -117,7 +117,7 @@ export class GoogleSheetsAdapter implements StoragePort {
     const dataRows = rows.slice(1);
     const filteredRows = dataRows.filter((row) => !articleIds.includes(row[0]));
 
-    console.log(`[GoogleSheetsAdapter] Filtering Saved: ${dataRows.length} rows -> ${filteredRows.length} rows.`);
+    console.log(`[GoogleSheetsStorage] Filtering Saved: ${dataRows.length} rows -> ${filteredRows.length} rows.`);
 
     await this.sheets.spreadsheets.values.clear({
       spreadsheetId: this.spreadsheetId,
@@ -134,7 +134,7 @@ export class GoogleSheetsAdapter implements StoragePort {
 
   private async appendArticles(tab: string, articles: Article[]): Promise<void> {
     if (articles.length === 0) {
-      console.log(`[GoogleSheetsAdapter] No articles to append to ${tab}.`);
+      console.log(`[GoogleSheetsStorage] No articles to append to ${tab}.`);
       return;
     }
 
@@ -166,7 +166,7 @@ export class GoogleSheetsAdapter implements StoragePort {
       requestBody: { values },
     });
 
-    console.log(`[GoogleSheetsAdapter] Successfully appended ${result.data.updates?.updatedRows} rows to ${tab}.`);
+    console.log(`[GoogleSheetsStorage] Successfully appended ${result.data.updates?.updatedRows} rows to ${tab}.`);
   }
 
   async deleteFromInbox(articleIds: string[]): Promise<void> {
@@ -185,7 +185,7 @@ export class GoogleSheetsAdapter implements StoragePort {
     
     const filteredRows = dataRows.filter((row) => !articleIds.includes(row[0]));
 
-    console.log(`[GoogleSheetsAdapter] Filtering Inbox: ${dataRows.length} rows -> ${filteredRows.length} rows.`);
+    console.log(`[GoogleSheetsStorage] Filtering Inbox: ${dataRows.length} rows -> ${filteredRows.length} rows.`);
 
     // Clear and rewrite
     await this.sheets.spreadsheets.values.clear({
@@ -239,7 +239,7 @@ export class GoogleSheetsAdapter implements StoragePort {
       const articleIndex = dataRows.findIndex(row => row[0] === article.id);
       if (articleIndex === -1) continue;
 
-      console.log(`[GoogleSheetsAdapter] Updating article ${article.id} in tab ${tab}...`);
+      console.log(`[GoogleSheetsStorage] Updating article ${article.id} in tab ${tab}...`);
 
       const separator = article.summaryLanguage === 'fr' ? ';' : ',';
       const updatedRow = [

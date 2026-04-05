@@ -15,7 +15,7 @@ interface RawArticleLink {
   isSaved: boolean;
 }
 
-export class InoreaderAdapter implements ScraperPort {
+export class InoreaderScraper implements ScraperPort {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private mainPage: Page | null = null;
@@ -54,11 +54,11 @@ export class InoreaderAdapter implements ScraperPort {
 
     const loginButton = await page.$('a[href*="/login"]');
     if (!loginButton) {
-      console.log('[InoreaderAdapter] Already logged in.');
+      console.log('[InoreaderScraper] Already logged in.');
       return;
     }
 
-    console.log('[InoreaderAdapter] Authenticating...');
+    console.log('[InoreaderScraper] Authenticating...');
     await page.goto('https://www.inoreader.com/login');
 
     const cookieButton = await page.$('a:has-text("OK, I agree")');
@@ -75,11 +75,11 @@ export class InoreaderAdapter implements ScraperPort {
       page.click('button:has-text("Sign in")')
     ]);
 
-    console.log('[InoreaderAdapter] Authentication successful.');
+    console.log('[InoreaderScraper] Authentication successful.');
 
     const state = await this.context!.storageState();
     writeFileSync(this.sessionPath, JSON.stringify(state, null, 2));
-    console.log('[InoreaderAdapter] Session saved.');
+    console.log('[InoreaderScraper] Session saved.');
   }
 
   private async waitForArticlePane(page: Page): Promise<void> {
@@ -91,7 +91,7 @@ export class InoreaderAdapter implements ScraperPort {
       }, { timeout: 40000 });
       await page.waitForTimeout(2000);
     } catch {
-      console.warn('[InoreaderAdapter] Timed out waiting for articles.');
+      console.warn('[InoreaderScraper] Timed out waiting for articles.');
     }
   }
 
@@ -139,7 +139,7 @@ export class InoreaderAdapter implements ScraperPort {
       await page.waitForTimeout(2000);
 
       const found = await this.extractArticleLinks(page);
-      console.log(`[InoreaderAdapter] Found ${found.length} potential links (scroll ${scrolls}).`);
+      console.log(`[InoreaderScraper] Found ${found.length} potential links (scroll ${scrolls}).`);
 
       for (const a of found) {
         if (articles.length >= limit) break;
@@ -157,7 +157,7 @@ export class InoreaderAdapter implements ScraperPort {
         });
       }
 
-      console.log(`[InoreaderAdapter] Total unique articles: ${articles.length}`);
+      console.log(`[InoreaderScraper] Total unique articles: ${articles.length}`);
       if (articles.length >= limit) break;
       scrolls++;
     }
@@ -196,13 +196,13 @@ export class InoreaderAdapter implements ScraperPort {
         ? 'https://www.inoreader.com/starred'
         : 'https://www.inoreader.com/all_articles';
 
-      console.log(`[InoreaderAdapter] Navigating to ${target} (mode: ${this.mode})...`);
+      console.log(`[InoreaderScraper] Navigating to ${target} (mode: ${this.mode})...`);
       await page.goto(target);
       await this.waitForArticlePane(page);
 
       const articles = await this.scrollAndCollect(page, limit);
       const totalCount = await this.getUnreadCount(page);
-      console.log(`[InoreaderAdapter] Total found in UI: ${totalCount}`);
+      console.log(`[InoreaderScraper] Total found in UI: ${totalCount}`);
 
       return {
         articles,
@@ -233,7 +233,7 @@ export class InoreaderAdapter implements ScraperPort {
         publishedAt,
       };
     } catch (error) {
-      console.warn(`[InoreaderAdapter] Failed to fetch content for ${url}:`, error);
+      console.warn(`[InoreaderScraper] Failed to fetch content for ${url}:`, error);
       return { content: null, publishedAt: null };
     } finally {
       await page.close();
@@ -323,7 +323,7 @@ export class InoreaderAdapter implements ScraperPort {
     const action = this.mode === 'starred' ? 'unstar' : 'mark-as-read';
     const key = this.mode === 'starred' ? 's' : 'm';
 
-    console.log(`[InoreaderAdapter] Attempting to ${action} article ${articleId}...`);
+    console.log(`[InoreaderScraper] Attempting to ${action} article ${articleId}...`);
     const page = await this.initMarkReadPage();
 
     try {
@@ -339,12 +339,12 @@ export class InoreaderAdapter implements ScraperPort {
         await container.click({ position: { x: 10, y: 15 } });
         await page.waitForTimeout(300);
         await page.keyboard.press(key);
-        console.log(`[InoreaderAdapter] Successfully ${action}: ${url}`);
+        console.log(`[InoreaderScraper] Successfully ${action}: ${url}`);
       } else {
-        console.warn(`[InoreaderAdapter] Could not find article after scrolling: ${url}`);
+        console.warn(`[InoreaderScraper] Could not find article after scrolling: ${url}`);
       }
     } catch (error) {
-      console.error(`[InoreaderAdapter] Failed to ${action} ${url}:`, error);
+      console.error(`[InoreaderScraper] Failed to ${action} ${url}:`, error);
     }
   }
 

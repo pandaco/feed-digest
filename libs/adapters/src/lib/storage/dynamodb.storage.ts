@@ -10,7 +10,7 @@ import { Article, StoragePort } from '@feed-digest/core';
 
 type Collection = 'INBOX' | 'ALL' | 'SAVED';
 
-export class DynamoDbStorageAdapter implements StoragePort {
+export class DynamoDbStorage implements StoragePort {
   private docClient: DynamoDBDocumentClient;
   private tableName: string;
 
@@ -250,7 +250,7 @@ export class DynamoDbStorageAdapter implements StoragePort {
           new BatchWriteCommand({ RequestItems: { [this.tableName]: requests } })
         );
         const unprocessed = result.UnprocessedItems?.[this.tableName] ?? [];
-        requests = unprocessed;
+        requests = unprocessed as { PutRequest: { Item: Record<string, unknown> } }[];
         if (requests.length > 0) {
           retries++;
           await new Promise(r => setTimeout(r, Math.pow(2, retries) * 100));

@@ -4,7 +4,7 @@ import { Article, StoragePort } from '@feed-digest/core';
 
 const OPTIONAL_PROPERTIES = ['Scraper Source', 'Relevance Score', 'Snoozed Until'] as const;
 
-export class NotionAdapter implements StoragePort {
+export class NotionStorage implements StoragePort {
   private client: Client;
   private apiKey: string;
   private inboxDbId: string;
@@ -54,17 +54,17 @@ export class NotionAdapter implements StoragePort {
   }
 
   async appendToInbox(articles: Article[]): Promise<void> {
-    console.log(`[NotionAdapter] Appending ${articles.length} articles to Inbox...`);
+    console.log(`[NotionStorage] Appending ${articles.length} articles to Inbox...`);
     await this.appendArticles(this.inboxDbId, articles);
   }
 
   async appendToAll(articles: Article[]): Promise<void> {
-    console.log(`[NotionAdapter] Appending ${articles.length} articles to All...`);
+    console.log(`[NotionStorage] Appending ${articles.length} articles to All...`);
     await this.appendArticles(this.allDbId, articles);
   }
 
   async appendToSaved(articles: Article[]): Promise<void> {
-    console.log(`[NotionAdapter] Appending ${articles.length} articles to Saved...`);
+    console.log(`[NotionStorage] Appending ${articles.length} articles to Saved...`);
     await this.appendArticles(this.savedDbId, articles);
   }
 
@@ -94,7 +94,7 @@ export class NotionAdapter implements StoragePort {
   async deleteFromSaved(articleIds: string[]): Promise<void> {
     if (articleIds.length === 0) return;
 
-    console.log(`[NotionAdapter] Deleting ${articleIds.length} articles from Saved...`);
+    console.log(`[NotionStorage] Deleting ${articleIds.length} articles from Saved...`);
 
     const limit = pLimit(5);
     let deleted = 0;
@@ -122,13 +122,13 @@ export class NotionAdapter implements StoragePort {
       }
     })));
 
-    console.log(`[NotionAdapter] Deleted ${deleted} articles from Saved.`);
+    console.log(`[NotionStorage] Deleted ${deleted} articles from Saved.`);
   }
 
   async deleteFromInbox(articleIds: string[]): Promise<void> {
     if (articleIds.length === 0) return;
 
-    console.log(`[NotionAdapter] Deleting ${articleIds.length} articles from Inbox...`);
+    console.log(`[NotionStorage] Deleting ${articleIds.length} articles from Inbox...`);
 
     const limit = pLimit(5);
     let deleted = 0;
@@ -162,7 +162,7 @@ export class NotionAdapter implements StoragePort {
       }
     })));
 
-    console.log(`[NotionAdapter] Deleted ${deleted} articles from Inbox.`);
+    console.log(`[NotionStorage] Deleted ${deleted} articles from Inbox.`);
   }
 
   async getUntaggedArticles(): Promise<Article[]> {
@@ -197,7 +197,7 @@ export class NotionAdapter implements StoragePort {
 
       for (const page of results.results) {
         if (!('id' in page)) continue;
-        console.log(`[NotionAdapter] Updating article ${article.id} in page ${page.id}...`);
+        console.log(`[NotionStorage] Updating article ${article.id} in page ${page.id}...`);
 
         const updateProps: Record<string, any> = {
           'Title': { title: [{ text: { content: article.title } }] },
@@ -224,7 +224,7 @@ export class NotionAdapter implements StoragePort {
           } catch (err: any) {
             const missing = this.extractMissingProperty(err?.message ?? '');
             if (!retried && missing) {
-              console.warn(`[NotionAdapter] "${missing}" property not found, skipping it.`);
+              console.warn(`[NotionStorage] "${missing}" property not found, skipping it.`);
               this.skippedProperties.add(missing);
               delete updateProps[missing];
               retried = true;
@@ -314,7 +314,7 @@ export class NotionAdapter implements StoragePort {
 
   private async appendArticles(databaseId: string, articles: Article[]): Promise<void> {
     if (articles.length === 0) {
-      console.log('[NotionAdapter] No articles to append.');
+      console.log('[NotionStorage] No articles to append.');
       return;
     }
 
@@ -328,7 +328,7 @@ export class NotionAdapter implements StoragePort {
         } catch (err: any) {
           const missing = this.extractMissingProperty(err?.message ?? '');
           if (!retried && missing) {
-            console.warn(`[NotionAdapter] "${missing}" property not found, skipping it.`);
+            console.warn(`[NotionStorage] "${missing}" property not found, skipping it.`);
             this.skippedProperties.add(missing);
             delete props[missing];
             retried = true;
@@ -339,7 +339,7 @@ export class NotionAdapter implements StoragePort {
       }
     }
 
-    console.log(`[NotionAdapter] Appended ${articles.length} articles.`);
+    console.log(`[NotionStorage] Appended ${articles.length} articles.`);
   }
 
   private getRichText(prop: unknown): string {

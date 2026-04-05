@@ -7,7 +7,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { TagOverride, TagPreference, TagPreferencePort, normalizeTag } from '@feed-digest/core';
 
-export class DynamoDbTagPreferenceAdapter implements TagPreferencePort {
+export class DynamoDbTagPreference implements TagPreferencePort {
   private docClient: DynamoDBDocumentClient;
   private tableName: string;
 

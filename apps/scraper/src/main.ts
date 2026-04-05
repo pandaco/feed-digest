@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv';
-import { InoreaderAdapter, CompositeScraperAdapter, TelegramAdapter, createStorage, createLlm, createTagPreference } from '@feed-digest/adapters';
+import { InoreaderScraper, CompositeScraper, TelegramNotifier, createStorage, createLlm, createTagPreference } from '@feed-digest/adapters';
 import { runPipeline } from '@feed-digest/pipeline';
 import { ScraperPort } from '@feed-digest/core';
 
@@ -8,9 +8,9 @@ dotenv.config();
 function createSingleScraper(source: string): ScraperPort {
   switch (source) {
     case 'inoreader':
-      return new InoreaderAdapter(process.cwd(), 'unread');
+      return new InoreaderScraper(process.cwd(), 'unread');
     case 'inoreader-saved':
-      return new InoreaderAdapter(process.cwd(), 'starred');
+      return new InoreaderScraper(process.cwd(), 'starred');
     default:
       throw new Error(`[Main] Unknown SCRAPER_SOURCE: "${source}". Supported: inoreader, inoreader-saved`);
   }
@@ -27,7 +27,7 @@ function createScraper(): ScraperPort {
   }
 
   console.log(`[Main] Multiple scraper sources: ${sources.join(', ')}`);
-  return new CompositeScraperAdapter(sources.map(createSingleScraper));
+  return new CompositeScraper(sources.map(createSingleScraper));
 }
 
 function isWithinScheduledWindow(): boolean {
@@ -59,7 +59,7 @@ async function main() {
   const storage = createStorage('Main');
   const { llm, provider: llmProvider } = createLlm('Main');
   const tagPreference = createTagPreference();
-  const notifier = new TelegramAdapter({
+  const notifier = new TelegramNotifier({
     token: process.env['TELEGRAM_BOT_TOKEN']!,
     chatId: process.env['TELEGRAM_CHAT_ID']!,
   });

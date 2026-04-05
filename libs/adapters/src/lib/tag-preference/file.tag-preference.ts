@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { TagOverride, TagPreference, TagPreferencePort, normalizeTag } from '@feed-digest/core';
 
-export class FileTagPreferenceAdapter implements TagPreferencePort {
+export class FileTagPreference implements TagPreferencePort {
   private readonly filePath: string;
 
   constructor(dir: string = process.cwd()) {

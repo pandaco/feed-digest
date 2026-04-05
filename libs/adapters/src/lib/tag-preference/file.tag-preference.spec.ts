@@ -2,15 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { FileTagPreferenceAdapter } from './file-tag-preference.adapter';
+import { FileTagPreference } from './file.tag-preference';
 
-describe('FileTagPreferenceAdapter', () => {
+describe('FileTagPreference', () => {
   let tmpDir: string;
-  let adapter: FileTagPreferenceAdapter;
+  let adapter: FileTagPreference;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'tag-pref-'));
-    adapter = new FileTagPreferenceAdapter(tmpDir);
+    adapter = new FileTagPreference(tmpDir);
   });
 
   afterEach(() => {

@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv';
-import { TelegramAdapter, createStorage, createLlm } from '@feed-digest/adapters';
+import { TelegramNotifier, createStorage, createLlm } from '@feed-digest/adapters';
 import { buildNotificationData } from '@feed-digest/pipeline';
 
 dotenv.config();
@@ -33,7 +33,7 @@ async function reEnrichUntagged(
 async function sendRecoveryNotification(
   storage: ReturnType<typeof createStorage>,
   llm: ReturnType<typeof createLlm>['llm'],
-  notifier: TelegramAdapter,
+  notifier: TelegramNotifier,
   summaryLang: string,
   llmProvider: string,
   languageName: string,
@@ -90,7 +90,7 @@ async function main() {
 
   const storage = createStorage('Recover');
   const { llm, provider: llmProvider } = createLlm('Recover');
-  const notifier = new TelegramAdapter({
+  const notifier = new TelegramNotifier({
     token: process.env['TELEGRAM_BOT_TOKEN']!,
     chatId: process.env['TELEGRAM_CHAT_ID']!,
   });

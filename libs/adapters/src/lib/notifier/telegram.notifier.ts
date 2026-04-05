@@ -1,7 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { NotifierPort, RunSummary } from '@feed-digest/core';
 
-export class TelegramAdapter implements NotifierPort {
+export class TelegramNotifier implements NotifierPort {
   private bot: TelegramBot;
   private chatId: string;
 
