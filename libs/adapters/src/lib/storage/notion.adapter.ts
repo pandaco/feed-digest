@@ -2,12 +2,15 @@ import { Client } from '@notionhq/client';
 import pLimit from 'p-limit';
 import { Article, StoragePort } from '@feed-digest/core';
 
+const OPTIONAL_PROPERTIES = ['Scraper Source', 'Relevance Score', 'Snoozed Until'] as const;
+
 export class NotionAdapter implements StoragePort {
   private client: Client;
   private apiKey: string;
   private inboxDbId: string;
   private allDbId: string;
   private savedDbId: string;
+  private skippedProperties = new Set<string>();
 
   constructor(config: {
     apiKey: string;
@@ -185,7 +188,6 @@ export class NotionAdapter implements StoragePort {
 
   async updateArticle(article: Article): Promise<void> {
     const dbIds = [this.inboxDbId, this.allDbId, this.savedDbId];
-    let includeScraperSource = true;
 
     for (const dataSourceId of dbIds) {
       const results = await this.queryDatabase(dataSourceId, {
@@ -206,23 +208,29 @@ export class NotionAdapter implements StoragePort {
           'Content Unavailable': { checkbox: article.contentUnavailable },
           'LLM Provider': { rich_text: [{ text: { content: article.llmProvider } }] },
           'Summary Language': { rich_text: [{ text: { content: article.summaryLanguage } }] },
+          'Scraper Source': { rich_text: [{ text: { content: article.scraperSource || '' } }] },
+          'Relevance Score': { rich_text: [{ text: { content: article.relevanceScore != null ? String(article.relevanceScore) : '' } }] },
+          'Snoozed Until': { rich_text: [{ text: { content: article.snoozedUntil || '' } }] },
         };
-        if (includeScraperSource) {
-          updateProps['Scraper Source'] = { rich_text: [{ text: { content: article.scraperSource || '' } }] };
+        for (const prop of this.skippedProperties) {
+          delete updateProps[prop];
         }
-        updateProps['Relevance Score'] = { rich_text: [{ text: { content: article.relevanceScore != null ? String(article.relevanceScore) : '' } }] };
-        updateProps['Snoozed Until'] = { rich_text: [{ text: { content: article.snoozedUntil || '' } }] };
 
-        try {
-          await this.client.pages.update({ page_id: page.id, properties: updateProps as any });
-        } catch (err: any) {
-          if (includeScraperSource && err?.message?.includes('Scraper Source is not a property')) {
-            console.warn('[NotionAdapter] "Scraper Source" property not found, skipping it.');
-            includeScraperSource = false;
-            delete updateProps['Scraper Source'];
+        let retried = false;
+        while (true) {
+          try {
             await this.client.pages.update({ page_id: page.id, properties: updateProps as any });
-          } else {
-            throw err;
+            break;
+          } catch (err: any) {
+            const missing = this.extractMissingProperty(err?.message ?? '');
+            if (!retried && missing) {
+              console.warn(`[NotionAdapter] "${missing}" property not found, skipping it.`);
+              this.skippedProperties.add(missing);
+              delete updateProps[missing];
+              retried = true;
+            } else {
+              throw err;
+            }
           }
         }
       }
@@ -273,7 +281,7 @@ export class NotionAdapter implements StoragePort {
     return articles;
   }
 
-  private buildArticleProperties(article: Article, includeScraperSource = true): Record<string, any> {
+  private buildArticleProperties(article: Article): Record<string, any> {
     const props: Record<string, any> = {
       'Title': { title: [{ text: { content: article.title } }] },
       'Article ID': { rich_text: [{ text: { content: article.id } }] },
@@ -287,17 +295,21 @@ export class NotionAdapter implements StoragePort {
       'Content Unavailable': { checkbox: article.contentUnavailable },
       'LLM Provider': { rich_text: [{ text: { content: article.llmProvider } }] },
       'Summary Language': { rich_text: [{ text: { content: article.summaryLanguage } }] },
+      'Scraper Source': { rich_text: [{ text: { content: article.scraperSource || '' } }] },
+      'Relevance Score': { rich_text: [{ text: { content: article.relevanceScore != null ? String(article.relevanceScore) : '' } }] },
+      'Snoozed Until': { rich_text: [{ text: { content: article.snoozedUntil || '' } }] },
     };
-    if (includeScraperSource) {
-      props['Scraper Source'] = { rich_text: [{ text: { content: article.scraperSource || '' } }] };
-    }
-    if (article.relevanceScore != null) {
-      props['Relevance Score'] = { rich_text: [{ text: { content: String(article.relevanceScore) } }] };
-    }
-    if (article.snoozedUntil) {
-      props['Snoozed Until'] = { rich_text: [{ text: { content: article.snoozedUntil } }] };
+    for (const prop of this.skippedProperties) {
+      delete props[prop];
     }
     return props;
+  }
+
+  private extractMissingProperty(errorMessage: string): string | null {
+    for (const prop of OPTIONAL_PROPERTIES) {
+      if (errorMessage.includes(`${prop} is not a property`)) return prop;
+    }
+    return null;
   }
 
   private async appendArticles(databaseId: string, articles: Article[]): Promise<void> {
@@ -306,24 +318,23 @@ export class NotionAdapter implements StoragePort {
       return;
     }
 
-    let includeScraperSource = true;
-
     for (const article of articles) {
-      try {
-        await this.client.pages.create({
-          parent: { database_id: databaseId },
-          properties: this.buildArticleProperties(article, includeScraperSource),
-        });
-      } catch (err: any) {
-        if (includeScraperSource && err?.message?.includes('Scraper Source is not a property')) {
-          console.warn('[NotionAdapter] "Scraper Source" property not found in database, skipping it.');
-          includeScraperSource = false;
-          await this.client.pages.create({
-            parent: { database_id: databaseId },
-            properties: this.buildArticleProperties(article, false),
-          });
-        } else {
-          throw err;
+      const props = this.buildArticleProperties(article);
+      let retried = false;
+      while (true) {
+        try {
+          await this.client.pages.create({ parent: { database_id: databaseId }, properties: props });
+          break;
+        } catch (err: any) {
+          const missing = this.extractMissingProperty(err?.message ?? '');
+          if (!retried && missing) {
+            console.warn(`[NotionAdapter] "${missing}" property not found, skipping it.`);
+            this.skippedProperties.add(missing);
+            delete props[missing];
+            retried = true;
+          } else {
+            throw err;
+          }
         }
       }
     }
