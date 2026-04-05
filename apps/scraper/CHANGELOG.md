@@ -1,3 +1,17 @@
+## 0.3.0 (2026-04-05)
+
+### 🚀 Features
+
+- **dashboard:** make date format configurable via DATE_FORMAT env var ([2f9eef2](https://github.com/pandaco/feed-digest/commit/2f9eef2))
+- **ci:** simplify to 6 slots every 3h from 07h to 22h Paris ([3e58571](https://github.com/pandaco/feed-digest/commit/3e58571))
+- **ci:** run every 2h from 07h to 21h Paris and fix notification timezone ([fc0ee8b](https://github.com/pandaco/feed-digest/commit/fc0ee8b))
+- **scraper:** replace setup-notion with generic setup script for all backends ([2f55350](https://github.com/pandaco/feed-digest/commit/2f55350))
+- **scraper:** add setup-notion script to provision Notion database schema ([84d9120](https://github.com/pandaco/feed-digest/commit/84d9120))
+
+### 🩹 Fixes
+
+- **scraper:** fix setup script for Notion type check and Google Sheets column order ([9ed4ce0](https://github.com/pandaco/feed-digest/commit/9ed4ce0))
+
 ## 0.2.0 (2026-04-02)
 
 ### 🚀 Features

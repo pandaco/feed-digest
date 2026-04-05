@@ -1,3 +1,31 @@
+## 0.3.0 (2026-04-05)
+
+### 🚀 Features
+
+- **ci:** run every 2h from 07h to 21h Paris and fix notification timezone ([fc0ee8b](https://github.com/pandaco/feed-digest/commit/fc0ee8b))
+- **ci:** simplify to 6 slots every 3h from 07h to 22h Paris ([3e58571](https://github.com/pandaco/feed-digest/commit/3e58571))
+- **core:** add article snooze with presets and dedicated page ([a1ad0ea](https://github.com/pandaco/feed-digest/commit/a1ad0ea))
+- **core:** add LLM relevance scoring with user interest profile ([c086879](https://github.com/pandaco/feed-digest/commit/c086879))
+- **core:** add table of contents extraction for long articles ([bde1007](https://github.com/pandaco/feed-digest/commit/bde1007))
+- **core:** add LLM usage tracking and simplify Telegram notification ([588841b](https://github.com/pandaco/feed-digest/commit/588841b))
+- **dashboard:** enhance search with tag matching and relevance scoring ([133acad](https://github.com/pandaco/feed-digest/commit/133acad))
+- **dashboard:** add tag-based article clustering with synthesis ([8b36a56](https://github.com/pandaco/feed-digest/commit/8b36a56))
+- **dashboard:** add focus mode reader view with clean typography ([a61966c](https://github.com/pandaco/feed-digest/commit/a61966c))
+- **dashboard:** enhance cluster view with dates, bulk actions and recursive splitting ([3a0baa0](https://github.com/pandaco/feed-digest/commit/3a0baa0))
+- **dashboard:** make date format configurable via localStorage ([6194fa8](https://github.com/pandaco/feed-digest/commit/6194fa8))
+- **dashboard:** make date format configurable via DATE_FORMAT env var ([2f9eef2](https://github.com/pandaco/feed-digest/commit/2f9eef2))
+- **scraper:** add setup-notion script to provision Notion database schema ([84d9120](https://github.com/pandaco/feed-digest/commit/84d9120))
+- **scraper:** replace setup-notion with generic setup script for all backends ([2f55350](https://github.com/pandaco/feed-digest/commit/2f55350))
+
+### 🩹 Fixes
+
+- **adapters:** gracefully skip missing optional Notion properties ([bb8fa6f](https://github.com/pandaco/feed-digest/commit/bb8fa6f))
+- **adapters:** send Relevance Score as Notion number type, not rich_text ([d50a2e8](https://github.com/pandaco/feed-digest/commit/d50a2e8))
+- **core:** skip noise filter when excerpt is empty ([d8f7da7](https://github.com/pandaco/feed-digest/commit/d8f7da7))
+- **dashboard:** use consistent YYYY-MM-DD HH:mm format for all dates ([34578ac](https://github.com/pandaco/feed-digest/commit/34578ac))
+- **dashboard:** force YYYY-MM-DD HH:mm date format regardless of browser locale ([f20a0bb](https://github.com/pandaco/feed-digest/commit/f20a0bb))
+- **scraper:** fix setup script for Notion type check and Google Sheets column order ([9ed4ce0](https://github.com/pandaco/feed-digest/commit/9ed4ce0))
+
 ## Unreleased
 
 ### 🚀 Features
