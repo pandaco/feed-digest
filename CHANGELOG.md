@@ -10,7 +10,14 @@
 - **core:** add table of contents extraction for long articles ([bde1007](https://github.com/pandaco/feed-digest/commit/bde1007))
 - **core:** add LLM usage tracking (calls + tokens) and rich Telegram notification with pipeline funnel, importance, relevance, top sources ([91b61ee](https://github.com/pandaco/feed-digest/commit/91b61ee))
 - **dashboard:** enhance cluster view with per-article dates, checkboxes, bulk save/delete, recursive splitting for large clusters, refresh button, and consistent page layouts ([c7f0823](https://github.com/pandaco/feed-digest/commit/c7f0823))
-- **ci:** upgrade GitHub Actions to v5 and add 5 daily scraper schedules (07h, 10h, 13h, 16h, 19h Paris) ([10b17f0](https://github.com/pandaco/feed-digest/commit/10b17f0))
+- **ci:** run every 3h from 07h to 22h Paris time (6 daily slots) with TZ=Europe/Paris for correct timestamps ([3e58571](https://github.com/pandaco/feed-digest/commit/3e58571))
+- **scraper:** generic `npm run setup` command to provision schema for Notion or Google Sheets ([2f55350](https://github.com/pandaco/feed-digest/commit/2f55350))
+
+### 🩹 Fixes
+
+- **adapters:** send Relevance Score as Notion number type instead of rich_text ([d50a2e8](https://github.com/pandaco/feed-digest/commit/d50a2e8))
+- **adapters:** gracefully skip missing optional Notion properties (Relevance Score, Snoozed Until, Scraper Source) ([bb8fa6f](https://github.com/pandaco/feed-digest/commit/bb8fa6f))
+- **ci:** install chromium-headless-shell via playwright-core to fix Playwright 1.58 headless binary ([0888155](https://github.com/pandaco/feed-digest/commit/0888155))
 
 ### 🔧 Improvements
 

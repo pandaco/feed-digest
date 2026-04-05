@@ -1,6 +1,6 @@
 # feed-digest
 
-Automated tech watch pipeline. Collects unread articles from InoReader, enriches them via an LLM (Claude or Gemini) with summaries, tags, and importance levels, then stores them in Google Sheets or Notion. The user receives an interactive Telegram notification to filter articles by tags.
+Automated tech watch pipeline. Collects unread articles from InoReader, enriches them via an LLM (Claude or Gemini) with summaries, tags, and importance levels, then stores them in Google Sheets or Notion. A Telegram notification is sent after each run with a rich stats summary.
 
 ## Architecture
 

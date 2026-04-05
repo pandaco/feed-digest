@@ -325,7 +325,7 @@ Add these variables (Settings > Secrets and variables > Actions > Variables):
 - `USER_INTERESTS` — free-text interest profile for LLM relevance scoring
 
 ### 6.3 Deployment
-Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployment, and the `scraper` workflow will run five times daily (07h, 10h, 13h, 16h, 19h Paris time — with both winter/summer UTC variants).
+Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployment, and the `scraper` workflow will run six times daily every 3 hours (07h, 10h, 13h, 16h, 19h, 22h Paris time — with both winter/summer UTC variants). The `TZ=Europe/Paris` env var ensures logs and Telegram notifications display Paris time.
 
 ---
 
