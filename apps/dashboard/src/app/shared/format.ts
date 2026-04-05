@@ -1,13 +1,25 @@
+const DEFAULT_DATE_FORMAT = 'yyyy-MM-dd HH:mm';
+
+function applyDateFormat(d: Date, fmt: string): string {
+  const yyyy = String(d.getFullYear());
+  const MM   = String(d.getMonth() + 1).padStart(2, '0');
+  const dd   = String(d.getDate()).padStart(2, '0');
+  const HH   = String(d.getHours()).padStart(2, '0');
+  const mm   = String(d.getMinutes()).padStart(2, '0');
+  return fmt
+    .replace('yyyy', yyyy)
+    .replace('MM', MM)
+    .replace('dd', dd)
+    .replace('HH', HH)
+    .replace('mm', mm);
+}
+
 export function formatDate(iso?: string): string {
   if (!iso) return '-';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '-';
-  const yyyy = d.getFullYear();
-  const mm   = String(d.getMonth() + 1).padStart(2, '0');
-  const dd   = String(d.getDate()).padStart(2, '0');
-  const hh   = String(d.getHours()).padStart(2, '0');
-  const min  = String(d.getMinutes()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  const fmt = (typeof localStorage !== 'undefined' && localStorage.getItem('DATE_FORMAT')) || DEFAULT_DATE_FORMAT;
+  return applyDateFormat(d, fmt);
 }
 
 export function formatScore(score: number): string {
