@@ -5,8 +5,6 @@ export * from './lib/storage/notion.adapter';
 export * from './lib/llm/claude.adapter';
 export * from './lib/llm/gemini.adapter';
 export * from './lib/notifier/telegram.adapter';
-export * from './lib/session/dynamodb.adapter';
-export * from './lib/session/in-memory-session.adapter';
 export * from './lib/tag-preference/dynamodb-tag-preference.adapter';
 export * from './lib/tag-preference/file-tag-preference.adapter';
 export * from './lib/factories';

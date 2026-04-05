@@ -16,7 +16,6 @@ provider:
     NOTION_INBOX_DB_ID: ${ssm:/feed-digest/${self:provider.stage}/NOTION_INBOX_DB_ID, ""}
     NOTION_ALL_DB_ID: ${ssm:/feed-digest/${self:provider.stage}/NOTION_ALL_DB_ID, ""}
     NOTION_SAVED_DB_ID: ${ssm:/feed-digest/${self:provider.stage}/NOTION_SAVED_DB_ID, ""}
-    DYNAMODB_TABLE_NAME: !Ref SessionsTable
     DYNAMODB_ARTICLES_TABLE_NAME: !Ref ArticlesTable
     DYNAMODB_TAG_PREF_TABLE_NAME: !Ref TagPrefsTable
     USER_INTERESTS: ${ssm:/feed-digest/${self:provider.stage}/USER_INTERESTS, ""}
@@ -24,12 +23,6 @@ provider:
   iam:
     role:
       statements:
-        - Effect: Allow
-          Action:
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-            - dynamodb:DeleteItem
-          Resource: !GetAtt SessionsTable.Arn
         - Effect: Allow
           Action:
             - dynamodb:GetItem
@@ -60,21 +53,6 @@ functions:
 
 resources:
   Resources:
-    SessionsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: feed-digest-sessions-${self:provider.stage}
-        BillingMode: PAY_PER_REQUEST
-        AttributeDefinitions:
-          - AttributeName: chatId
-            AttributeType: S
-        KeySchema:
-          - AttributeName: chatId
-            KeyType: HASH
-        TimeToLiveSpecification:
-          AttributeName: ttl
-          Enabled: true
-
     ArticlesTable:
       Type: AWS::DynamoDB::Table
       Properties:

@@ -4,10 +4,8 @@ import {
   LlmPort,
   NotifierPort,
   ScraperPort,
-  SessionPort,
   StoragePort,
   TagPreferencePort,
-  TelegramSession,
   normalizeTag,
   deduplicate,
   filterNoise,
@@ -18,7 +16,6 @@ export interface RunPipelineOptions {
   llm: LlmPort;
   storage: StoragePort;
   notifier: NotifierPort;
-  session: SessionPort;
   summaryLang: string;
   telegramChatId: string;
   llmProvider: 'claude' | 'gemini';
@@ -146,91 +143,21 @@ async function enrichAndSave(
 
 export interface BuildNotificationDataOptions {
   articles: Article[];
-  tagPreference?: TagPreferencePort;
-  chatId?: string;
 }
 
-export async function buildNotificationData(options: BuildNotificationDataOptions) {
-  const { articles, tagPreference, chatId } = options;
+export function buildNotificationData(options: BuildNotificationDataOptions): { tagCounts: Record<string, number>; sourceCounts: Record<string, number> } {
+  const { articles } = options;
   const tagCounts: Record<string, number> = {};
   const sourceCounts: Record<string, number> = {};
-  const sessionTags: TelegramSession['tags'] = {};
-  const articleCache: TelegramSession['articles'] = {};
-  const savedArticles: { title: string; url: string }[] = [];
-  const preSelected: Record<string, boolean> = {};
 
   for (const article of articles) {
-    articleCache[article.id] = { title: article.title, url: article.url };
     sourceCounts[article.feedSource] = (sourceCounts[article.feedSource] || 0) + 1;
-    if (article.isSaved) {
-      savedArticles.push({ title: article.title, url: article.url });
-    }
     for (const tag of article.tags) {
       tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-      if (!sessionTags[tag]) {
-        sessionTags[tag] = { selected: false, articleIds: [] };
-      }
-      sessionTags[tag].articleIds.push(article.id);
     }
   }
 
-  // Compute pre-selection and filtering from learned preferences
-  const threshold = parseFloat(process.env['TAG_PREFERENCE_THRESHOLD'] || '0.6');
-  const minRuns = parseInt(process.env['TAG_PREFERENCE_MIN_RUNS'] || '3', 10);
-  const filteredTags = new Set<string>();
-
-  if (tagPreference && chatId) {
-    const prefs = await tagPreference.get(chatId);
-    if (prefs) {
-      const overrides = prefs.tagOverrides ?? {};
-      for (const tag of Object.keys(sessionTags)) {
-        const override = overrides[normalizeTag(tag)];
-
-        if (override === 'filtered') {
-          filteredTags.add(tag);
-          continue;
-        }
-
-        if (override === 'auto') {
-          preSelected[tag] = true;
-          sessionTags[tag].selected = true;
-          continue;
-        }
-
-        // Default: threshold-based auto-selection
-        const stats = prefs.tags[normalizeTag(tag)];
-        if (stats && stats.presentedCount >= minRuns) {
-          const score = stats.selectionCount / stats.presentedCount;
-          if (score >= threshold) {
-            preSelected[tag] = true;
-            sessionTags[tag].selected = true;
-          }
-        }
-      }
-    }
-  }
-
-  // Build visible tag counts (excluding filtered tags)
-  const visibleTagCounts: Record<string, number> = {};
-  for (const [tag, count] of Object.entries(tagCounts)) {
-    if (!filteredTags.has(tag)) {
-      visibleTagCounts[tag] = count;
-    }
-  }
-
-  // Sort: pre-selected first, then by frequency
-  const tagOrder = Object.entries(visibleTagCounts)
-    .sort((a, b) => {
-      const aSelected = preSelected[a[0]] ? 1 : 0;
-      const bSelected = preSelected[b[0]] ? 1 : 0;
-      if (aSelected !== bSelected) return bSelected - aSelected;
-      return b[1] - a[1];
-    })
-    .map(entry => entry[0]);
-
-  const preSelectedCount = Object.keys(preSelected).length;
-
-  return { tagCounts: visibleTagCounts, sourceCounts, sessionTags, articleCache, savedArticles, tagOrder, preSelected, preSelectedCount, filteredTags };
+  return { tagCounts, sourceCounts };
 }
 
 interface RunStats {

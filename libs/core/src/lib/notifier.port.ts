@@ -61,32 +61,6 @@ export interface NotifierPort {
   sendSynthesis(synthesis: string, language: string): Promise<void>;
 
   /**
-   * Sends the tag selection message with inline keyboard buttons.
-   * @returns The unique ID of the sent message (for callback handling).
-   */
-  sendTagSelection(tagCounts: Record<string, number>, language: string, preSelected?: Record<string, boolean>): Promise<string>;
-
-  /**
-   * Updates the inline keyboard buttons of an existing tag selection message.
-   */
-  updateButtons(messageId: string, tags: Record<string, boolean>, tagOrder?: string[], tagCounts?: Record<string, number>): Promise<void>;
-
-  /**
-   * Sends a final confirmation message after the user validates their selection.
-   */
-  sendConfirmation(keptNumber: number, removedNumber: number, language: string): Promise<void>;
-
-  /**
-   * Sends a list of articles associated with a specific tag.
-   */
-  sendTagArticles(tagName: string, articles: { title: string; url: string }[], language: string): Promise<void>;
-
-  /**
-   * Sends a list of saved/starred articles.
-   */
-  sendSavedArticles(articles: { title: string; url: string }[], language: string): Promise<void>;
-
-  /**
    * Sends an error alert message to the user.
    */
   sendError(message: string, language: string): Promise<void>;

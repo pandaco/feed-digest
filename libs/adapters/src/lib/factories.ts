@@ -1,11 +1,9 @@
-import { LlmPort, StoragePort, SessionPort, TagPreferencePort } from '@feed-digest/core';
+import { LlmPort, StoragePort, TagPreferencePort } from '@feed-digest/core';
 import { GoogleSheetsAdapter } from './storage/google-sheets.adapter';
 import { NotionAdapter } from './storage/notion.adapter';
 import { DynamoDbStorageAdapter } from './storage/dynamodb-storage.adapter';
 import { ClaudeAdapter } from './llm/claude.adapter';
 import { GeminiAdapter } from './llm/gemini.adapter';
-import { DynamoDbAdapter } from './session/dynamodb.adapter';
-import { FileSessionAdapter } from './session/in-memory-session.adapter';
 import { DynamoDbTagPreferenceAdapter } from './tag-preference/dynamodb-tag-preference.adapter';
 import { FileTagPreferenceAdapter } from './tag-preference/file-tag-preference.adapter';
 
@@ -45,15 +43,6 @@ export function createLlm(label = 'App'): { llm: LlmPort; provider: 'claude' | '
     default:
       throw new Error(`[${label}] Unknown LLM_PROVIDER: "${provider}". Supported: claude, gemini`);
   }
-}
-
-export function createSession(): SessionPort {
-  return process.env['NODE_ENV'] === 'development'
-    ? new FileSessionAdapter()
-    : new DynamoDbAdapter({
-        region: process.env['AWS_REGION'] || 'eu-west-1',
-        tableName: process.env['DYNAMODB_TABLE_NAME']!,
-      });
 }
 
 export function createTagPreference(): TagPreferencePort {

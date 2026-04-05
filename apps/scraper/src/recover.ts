@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv';
-import { TelegramAdapter, createStorage, createLlm, createSession } from '@feed-digest/adapters';
+import { TelegramAdapter, createStorage, createLlm } from '@feed-digest/adapters';
 import { buildNotificationData } from '@feed-digest/pipeline';
 
 dotenv.config();
@@ -34,7 +34,6 @@ async function sendRecoveryNotification(
   storage: ReturnType<typeof createStorage>,
   llm: ReturnType<typeof createLlm>['llm'],
   notifier: TelegramAdapter,
-  session: ReturnType<typeof createSession>,
   summaryLang: string,
   llmProvider: string,
   languageName: string,
@@ -50,8 +49,7 @@ async function sendRecoveryNotification(
   console.log(`[Recover] Re-sending summary for ${articles.length} articles.`);
 
   const runSynthesis = await llm.summarizeRun(articles, languageName);
-  const { tagCounts, sourceCounts, sessionTags, articleCache, tagOrder } =
-    await buildNotificationData({ articles });
+  const { tagCounts, sourceCounts } = buildNotificationData({ articles });
 
   const recoveryDate = new Date();
   const runLabel = recoveryDate.getHours() < 12 ? 'morning' : 'evening';
@@ -70,18 +68,6 @@ async function sendRecoveryNotification(
   if (runSynthesis) {
     await notifier.sendSynthesis(runSynthesis, summaryLang);
   }
-
-  const messageId = await notifier.sendTagSelection(tagCounts, summaryLang);
-
-  await session.save({
-    chatId: process.env['TELEGRAM_CHAT_ID']!,
-    messageId,
-    runAt: recoveryDate.toISOString(),
-    tags: sessionTags,
-    tagOrder,
-    articles: articleCache,
-    ttl: Math.floor(Date.now() / 1000) + 43200,
-  });
 
   console.log('[Recover] Recovery successful. Check Telegram.');
 }
@@ -104,7 +90,6 @@ async function main() {
 
   const storage = createStorage('Recover');
   const { llm, provider: llmProvider } = createLlm('Recover');
-  const session = createSession();
   const notifier = new TelegramAdapter({
     token: process.env['TELEGRAM_BOT_TOKEN']!,
     chatId: process.env['TELEGRAM_CHAT_ID']!,
@@ -120,7 +105,7 @@ async function main() {
     } else {
       console.log('[Recover] No untagged articles found.');
     }
-    await sendRecoveryNotification(storage, llm, notifier, session, summaryLang, llmProvider, languageName);
+    await sendRecoveryNotification(storage, llm, notifier, summaryLang, llmProvider, languageName);
   } catch (error) {
     console.error('[Recover] Recovery failed:', error);
   } finally {

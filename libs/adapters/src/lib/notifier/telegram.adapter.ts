@@ -11,16 +11,9 @@ export class TelegramAdapter implements NotifierPort {
       evening: 'Run du soir',
       processed: 'Traités',
       remaining: 'articles restants pour le prochain run',
-      llm: 'LLM',
-      lang: 'Langue',
       duration: 'Durée',
       tagsIdentified: 'Tags identifiés',
-      selectToKeep: 'Cochez les tags à CONSERVER dans votre Inbox :',
-      validate: 'Valider la sélection',
-      confirmation: (kept: number, removed: number) => `Sélection validée ! ${kept} articles conservés, ${removed} articles retirés de l'Inbox.`,
-      tagArticles: (tag: string) => `Articles associés au tag <b>#${tag}</b> :`,
       trendingTopics: 'Sujets tendance',
-      savedArticlesTitle: 'Articles sauvegardés',
       sourceStatsTitle: 'Articles par source',
       error: (msg: string) => `⚠️ Erreur lors du run :\n${msg}`
     },
@@ -29,16 +22,9 @@ export class TelegramAdapter implements NotifierPort {
       evening: 'Evening run',
       processed: 'Processed',
       remaining: 'articles remaining for the next run',
-      llm: 'LLM',
-      lang: 'Lang',
       duration: 'Duration',
       tagsIdentified: 'Tags identified',
-      selectToKeep: 'Check tags to KEEP in your Inbox:',
-      validate: 'Validate selection',
-      confirmation: (kept: number, removed: number) => `Selection validated! ${kept} articles kept, ${removed} articles removed from the Inbox.`,
-      tagArticles: (tag: string) => `Articles for tag <b>#${tag}</b>:`,
       trendingTopics: 'Trending Topics',
-      savedArticlesTitle: 'Saved articles',
       sourceStatsTitle: 'Articles by source',
       error: (msg: string) => `⚠️ Error during run:\n${msg}`
     }
@@ -105,7 +91,7 @@ export class TelegramAdapter implements NotifierPort {
     }
 
     // Meta
-    message += `${i18n.lang} : ${summary.summaryLanguage}\n`;
+    message += `${isFr ? 'Langue' : 'Lang'} : ${summary.summaryLanguage}\n`;
     if (summary.durationMs) {
       message += `⏱ ${i18n.duration} : ${this.formatDuration(summary.durationMs)}\n`;
     }
@@ -143,137 +129,9 @@ export class TelegramAdapter implements NotifierPort {
     });
   }
 
-  async sendTagSelection(tagCounts: Record<string, number>, language: string, preSelected?: Record<string, boolean>): Promise<string> {
-    const i18n = this.messages[language] || this.messages['fr'];
-    const keyboard = this.buildKeyboard(tagCounts, i18n.validate, preSelected);
-
-    const sentMessage = await this.bot.sendMessage(this.chatId, i18n.selectToKeep, {
-      parse_mode: 'HTML',
-      reply_markup: { inline_keyboard: keyboard }
-    });
-
-    return sentMessage.message_id.toString();
-  }
-
-  async updateButtons(messageId: string, tags: Record<string, boolean>, tagOrder?: string[], tagCounts?: Record<string, number>): Promise<void> {
-    const i18n = this.messages['fr'];
-
-    const sortedKeys = tagOrder && tagOrder.length > 0
-      ? tagOrder.filter(k => tags[k] !== undefined)
-      : Object.keys(tags).sort((a, b) => a.localeCompare(b));
-
-    const keyboard: TelegramBot.InlineKeyboardButton[][] = [];
-
-    keyboard.push([{ text: `🚀 ${i18n.validate}`, callback_data: 'validate' }]);
-
-    for (let i = 0; i < sortedKeys.length && i < 96; i += 2) {
-      const row: TelegramBot.InlineKeyboardButton[] = [];
-      const tag1 = sortedKeys[i];
-      const icon1 = tags[tag1] ? '✅' : '⬜️';
-      row.push({ text: this.buildTagLabel(icon1, tag1, tagCounts?.[tag1]), callback_data: `toggle:${tag1}` });
-
-      if (i + 1 < sortedKeys.length) {
-        const tag2 = sortedKeys[i + 1];
-        const icon2 = tags[tag2] ? '✅' : '⬜️';
-        row.push({ text: this.buildTagLabel(icon2, tag2, tagCounts?.[tag2]), callback_data: `toggle:${tag2}` });
-      }
-      keyboard.push(row);
-    }
-
-    keyboard.push([{ text: `🚀 ${i18n.validate}`, callback_data: 'validate' }]);
-
-    await this.bot.editMessageReplyMarkup({ inline_keyboard: keyboard }, {
-      chat_id: this.chatId,
-      message_id: parseInt(messageId, 10)
-    });
-  }
-
-  async sendConfirmation(keptNumber: number, removedNumber: number, language: string): Promise<void> {
-    const i18n = this.messages[language] || this.messages['fr'];
-    await this.bot.sendMessage(this.chatId, i18n.confirmation(keptNumber, removedNumber));
-  }
-
-  async sendTagArticles(tagName: string, articles: { title: string; url: string }[], language: string): Promise<void> {
-    const i18n = this.messages[language] || this.messages['fr'];
-    let message = `${i18n.tagArticles(tagName)}\n\n`;
-
-    for (const article of articles) {
-      const line = `• <a href="${article.url}">${article.title}</a>\n`;
-      if (message.length + line.length > 4000) {
-        message += '…\n';
-        break;
-      }
-      message += line;
-    }
-
-    await this.bot.sendMessage(this.chatId, message, {
-      parse_mode: 'HTML',
-      disable_web_page_preview: true
-    });
-  }
-
-  async sendSavedArticles(articles: { title: string; url: string }[], language: string): Promise<void> {
-    if (articles.length === 0) return;
-    const i18n = this.messages[language] || this.messages['fr'];
-    let message = `<b>${i18n.savedArticlesTitle} (${articles.length})</b>\n\n`;
-
-    for (const article of articles) {
-      const line = `• <a href="${article.url}">${article.title}</a>\n`;
-      if (message.length + line.length > 4000) {
-        message += '…\n';
-        break;
-      }
-      message += line;
-    }
-
-    await this.bot.sendMessage(this.chatId, message, {
-      parse_mode: 'HTML',
-      disable_web_page_preview: true
-    });
-  }
-
   async sendError(message: string, language: string): Promise<void> {
     const i18n = this.messages[language] || this.messages['fr'];
     await this.bot.sendMessage(this.chatId, i18n.error(message));
-  }
-
-  private buildTagLabel(icon: string, tag: string, count?: number): string {
-    return count !== undefined ? `${icon} ${tag} (${count})` : `${icon} ${tag}`;
-  }
-
-  private buildKeyboard(tagCounts: Record<string, number>, validateLabel: string, preSelected?: Record<string, boolean>): TelegramBot.InlineKeyboardButton[][] {
-    const sortedTags = Object.entries(tagCounts)
-      .sort((a, b) => {
-        if (preSelected) {
-          const aSelected = preSelected[a[0]] ? 1 : 0;
-          const bSelected = preSelected[b[0]] ? 1 : 0;
-          if (aSelected !== bSelected) return bSelected - aSelected;
-        }
-        return b[1] - a[1];
-      })
-      .map(entry => entry[0]);
-
-    const keyboard: TelegramBot.InlineKeyboardButton[][] = [];
-
-    keyboard.push([{ text: `🚀 ${validateLabel}`, callback_data: 'validate' }]);
-
-    for (let i = 0; i < sortedTags.length && i < 96; i += 2) {
-      const row: TelegramBot.InlineKeyboardButton[] = [];
-      const tag1 = sortedTags[i];
-      const icon1 = preSelected?.[tag1] ? '✅' : '⬜️';
-      row.push({ text: this.buildTagLabel(icon1, tag1, tagCounts[tag1]), callback_data: `toggle:${tag1}` });
-
-      if (i + 1 < sortedTags.length) {
-        const tag2 = sortedTags[i + 1];
-        const icon2 = preSelected?.[tag2] ? '✅' : '⬜️';
-        row.push({ text: this.buildTagLabel(icon2, tag2, tagCounts[tag2]), callback_data: `toggle:${tag2}` });
-      }
-      keyboard.push(row);
-    }
-
-    keyboard.push([{ text: `🚀 ${validateLabel}`, callback_data: 'validate' }]);
-
-    return keyboard;
   }
 
   private formatNumber(n: number): string {
