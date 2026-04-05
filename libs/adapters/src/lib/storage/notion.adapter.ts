@@ -209,7 +209,7 @@ export class NotionAdapter implements StoragePort {
           'LLM Provider': { rich_text: [{ text: { content: article.llmProvider } }] },
           'Summary Language': { rich_text: [{ text: { content: article.summaryLanguage } }] },
           'Scraper Source': { rich_text: [{ text: { content: article.scraperSource || '' } }] },
-          'Relevance Score': { rich_text: [{ text: { content: article.relevanceScore != null ? String(article.relevanceScore) : '' } }] },
+          'Relevance Score': { number: article.relevanceScore ?? null },
           'Snoozed Until': { rich_text: [{ text: { content: article.snoozedUntil || '' } }] },
         };
         for (const prop of this.skippedProperties) {
@@ -253,7 +253,7 @@ export class NotionAdapter implements StoragePort {
       summaryLanguage: this.getRichText(props['Summary Language']),
       isSaved: false,
       scraperSource: this.getRichText(props['Scraper Source']),
-      relevanceScore: parseInt(this.getRichText(props['Relevance Score']), 10) || undefined,
+      relevanceScore: this.getNumber(props['Relevance Score']) ?? undefined,
       snoozedUntil: this.getRichText(props['Snoozed Until']) || undefined,
     };
   }
@@ -296,7 +296,7 @@ export class NotionAdapter implements StoragePort {
       'LLM Provider': { rich_text: [{ text: { content: article.llmProvider } }] },
       'Summary Language': { rich_text: [{ text: { content: article.summaryLanguage } }] },
       'Scraper Source': { rich_text: [{ text: { content: article.scraperSource || '' } }] },
-      'Relevance Score': { rich_text: [{ text: { content: article.relevanceScore != null ? String(article.relevanceScore) : '' } }] },
+      'Relevance Score': { number: article.relevanceScore ?? null },
       'Snoozed Until': { rich_text: [{ text: { content: article.snoozedUntil || '' } }] },
     };
     for (const prop of this.skippedProperties) {
@@ -364,6 +364,12 @@ export class NotionAdapter implements StoragePort {
       return p.url;
     }
     return '';
+  }
+
+  private getNumber(prop: unknown): number | null {
+    const p = prop as { type?: string; number?: number | null };
+    if (p?.type === 'number') return p.number ?? null;
+    return null;
   }
 
   private getCheckbox(prop: unknown): boolean {
