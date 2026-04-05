@@ -1,12 +1,16 @@
 name: InoReader Scraper
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   schedule:
     - cron: '0 6 * * *'    # 07:00 Paris winter (UTC+1)
     - cron: '0 5 * * *'    # 07:00 Paris summer (UTC+2)
+    - cron: '0 9 * * *'    # 10:00 Paris winter
+    - cron: '0 8 * * *'    # 10:00 Paris summer
+    - cron: '0 12 * * *'   # 13:00 Paris winter
+    - cron: '0 11 * * *'   # 13:00 Paris summer
+    - cron: '0 15 * * *'   # 16:00 Paris winter
+    - cron: '0 14 * * *'   # 16:00 Paris summer
     - cron: '0 18 * * *'   # 19:00 Paris winter
     - cron: '0 17 * * *'   # 19:00 Paris summer
   workflow_dispatch:
@@ -23,15 +27,15 @@ jobs:
     environment: prod
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: 'npm'
 
       - name: Restore local data (session + tag preferences)
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             session.json
@@ -44,7 +48,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+        run: npx playwright-core install chromium --with-deps
 
       - name: Build scraper
         run: npx nx build scraper
@@ -77,13 +81,14 @@ jobs:
           STORAGE_BACKEND: ${{ vars.STORAGE_BACKEND }}
           TAG_PREFERENCE_THRESHOLD: ${{ vars.TAG_PREFERENCE_THRESHOLD }}
           TAG_PREFERENCE_MIN_RUNS: ${{ vars.TAG_PREFERENCE_MIN_RUNS }}
+          USER_INTERESTS: ${{ vars.USER_INTERESTS }}
           # --- Static ---
           NODE_ENV: development
           RUN_NOW: ${{ inputs.run_now || 'false' }}
 
       - name: Save local data (session + tag preferences)
         if: always()
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             session.json
