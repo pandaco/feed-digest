@@ -31,6 +31,8 @@ export class TriageComponent {
         setTimeout(() => (document.querySelector('.help-modal button') as HTMLElement)?.focus());
       }
     });
+
+    this.loadInbox();
   }
 
   loading = signal(false);

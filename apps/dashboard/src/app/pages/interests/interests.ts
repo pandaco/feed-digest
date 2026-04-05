@@ -13,6 +13,10 @@ export class InterestsComponent {
   private service = inject(InboxService);
   private destroyRef = inject(DestroyRef);
 
+  constructor() {
+    this.loadInterests();
+  }
+
   loading = signal(false);
   saving = signal(false);
   error = signal<string | null>(null);

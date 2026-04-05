@@ -38,6 +38,8 @@ export class TagPreferencesComponent {
         this.errorTimer = setTimeout(() => this.error.set(null), 8000);
       }
     });
+
+    this.loadPreferences();
   }
 
   loading = signal(false);

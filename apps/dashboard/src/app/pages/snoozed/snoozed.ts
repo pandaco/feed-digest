@@ -13,6 +13,10 @@ export class SnoozedComponent {
   private service = inject(InboxService);
   private destroyRef = inject(DestroyRef);
 
+  constructor() {
+    this.loadSnoozed();
+  }
+
   loading = signal(false);
   error = signal<string | null>(null);
   articles = signal<Article[]>([]);

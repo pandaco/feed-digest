@@ -88,6 +88,8 @@ export class InboxComponent {
         prevMap.set(c.id, c.articles.map(a => a.id));
       }
     }, { allowSignalWrites: true });
+
+    this.loadInbox();
   }
 
   loading = signal(false);

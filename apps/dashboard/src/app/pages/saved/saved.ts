@@ -34,6 +34,8 @@ export class SavedComponent {
       this.filteredArticles();
       this.currentPage.set(1);
     }, { allowSignalWrites: true });
+
+    this.loadSaved();
   }
 
   loading = signal(false);
