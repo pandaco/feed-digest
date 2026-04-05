@@ -7,15 +7,13 @@ export interface Cluster {
   label: string;
 }
 
-/**
- * Groups articles that share >= 2 tags.
- * Uses a greedy union-find approach: for each pair of articles sharing >= 2 tags,
- * merge them into the same cluster.
- */
-export function clusterArticles(articles: Article[]): Cluster[] {
-  if (articles.length === 0) return [];
+const MAX_CLUSTER_SIZE = 30;
 
-  // parent map for union-find
+/**
+ * Union-find clustering: articles sharing >= minShared tags are merged.
+ * Returns raw groups (arrays of articles), including singletons.
+ */
+function unionFindGroups(articles: Article[], minShared: number): Article[][] {
   const parent = new Map<number, number>();
   for (let i = 0; i < articles.length; i++) parent.set(i, i);
 
@@ -33,17 +31,15 @@ export function clusterArticles(articles: Article[]): Cluster[] {
     if (ra !== rb) parent.set(ra, rb);
   }
 
-  // Union articles sharing >= 2 tags
   for (let i = 0; i < articles.length; i++) {
     for (let j = i + 1; j < articles.length; j++) {
       const shared = articles[i].tags.filter(t => articles[j].tags.includes(t));
-      if (shared.length >= 2) {
+      if (shared.length >= minShared) {
         union(i, j);
       }
     }
   }
 
-  // Group by root
   const groups = new Map<number, number[]>();
   for (let i = 0; i < articles.length; i++) {
     const root = find(i);
@@ -51,31 +47,74 @@ export function clusterArticles(articles: Article[]): Cluster[] {
     groups.get(root)!.push(i);
   }
 
-  // Build clusters (only groups with > 1 article)
-  const clusters: Cluster[] = [];
-  for (const [, indices] of groups) {
-    if (indices.length < 2) continue;
+  return [...groups.values()].map(indices => indices.map(i => articles[i]));
+}
 
-    const clusterArticles = indices.map(i => articles[i]);
-
-    // Find tags shared by at least 2 articles in the cluster
-    const tagCounts = new Map<string, number>();
-    for (const a of clusterArticles) {
-      for (const t of a.tags) {
-        tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
-      }
+/**
+ * Builds a Cluster object from a list of articles.
+ */
+function buildCluster(articles: Article[]): Cluster {
+  const tagCounts = new Map<string, number>();
+  for (const a of articles) {
+    for (const t of a.tags) {
+      tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
     }
-    const sharedTags = [...tagCounts.entries()]
-      .filter(([, count]) => count >= 2)
-      .sort((a, b) => b[1] - a[1])
-      .map(([tag]) => tag);
+  }
+  const sharedTags = [...tagCounts.entries()]
+    .filter(([, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .map(([tag]) => tag);
 
-    clusters.push({
-      id: sharedTags.join('-') || `cluster-${indices[0]}`,
-      articles: clusterArticles,
-      sharedTags,
-      label: sharedTags.slice(0, 3).join(', ') || 'Related articles',
-    });
+  articles.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+
+  return {
+    id: sharedTags.join('-') || `cluster-${articles[0]?.id ?? '0'}`,
+    articles,
+    sharedTags,
+    label: sharedTags.slice(0, 3).join(', ') || 'Related articles',
+  };
+}
+
+/**
+ * Groups articles that share >= 2 tags using union-find.
+ * Large clusters (> MAX_CLUSTER_SIZE) are recursively split
+ * by raising the minimum shared tag threshold.
+ */
+export function clusterArticles(articles: Article[]): Cluster[] {
+  if (articles.length === 0) return [];
+
+  const clusters: Cluster[] = [];
+
+  function splitGroup(group: Article[], minShared: number): void {
+    if (group.length < 2) return;
+
+    // If group is small enough or we can't split further, emit it
+    if (group.length <= MAX_CLUSTER_SIZE || minShared > 5) {
+      clusters.push(buildCluster(group));
+      return;
+    }
+
+    // Try splitting with a higher threshold
+    const subGroups = unionFindGroups(group, minShared + 1);
+    const multiGroups = subGroups.filter(g => g.length >= 2);
+
+    if (multiGroups.length <= 1) {
+      // Higher threshold didn't split — accept as-is
+      clusters.push(buildCluster(group));
+      return;
+    }
+
+    // Recursively process sub-groups
+    for (const sub of multiGroups) {
+      splitGroup(sub, minShared + 1);
+    }
+  }
+
+  // Initial pass with minShared = 2
+  const initialGroups = unionFindGroups(articles, 2);
+  for (const group of initialGroups) {
+    if (group.length < 2) continue;
+    splitGroup(group, 2);
   }
 
   return clusters.sort((a, b) => b.articles.length - a.articles.length);

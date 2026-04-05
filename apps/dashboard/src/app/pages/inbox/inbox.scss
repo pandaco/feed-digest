@@ -666,6 +666,18 @@ kbd {
   opacity: 0.8;
 }
 
+.clusters-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.clusters-info {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #64748b);
+}
+
 .clusters-section {
   display: flex;
   flex-direction: column;
@@ -750,8 +762,33 @@ kbd {
 
     a {
       flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
+}
+
+.cluster-select-all {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #64748b);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.cluster-article-date {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #64748b);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cluster-article-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .unclustered-label {

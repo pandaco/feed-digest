@@ -210,7 +210,6 @@ export class SavedComponent {
   bulkDelete(): void {
     const ids = [...this.selectedIds()];
     if (ids.length === 0) return;
-    if (!confirm(`Remove ${ids.length} article${ids.length > 1 ? 's' : ''} from saved?`)) return;
 
     this.deleting.set(true);
     this.error.set(null);
@@ -254,7 +253,6 @@ export class SavedComponent {
 
   deleteArticle(article: Article): void {
     if (this.deletingIds().has(article.id)) return;
-    if (!confirm(`Remove "${article.title}" from saved?`)) return;
 
     this.deletingIds.update(set => new Set(set).add(article.id));
 

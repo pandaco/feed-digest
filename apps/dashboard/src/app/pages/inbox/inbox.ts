@@ -2,6 +2,7 @@ import { Component, inject, signal, computed, effect, DestroyRef, HostListener, 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
+import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { InboxService, Article } from '../../services/inbox.service';
 import { TagPreferenceService } from '../../services/tag-preference.service';
@@ -24,7 +25,7 @@ const IMPORTANCE_TOOLTIP: Record<string, string> = {
 
 @Component({
   selector: 'app-inbox',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, DatePipe],
   templateUrl: './inbox.html',
   styleUrl: './inbox.scss',
 })
@@ -35,6 +36,7 @@ export class InboxComponent {
   private sanitizer = inject(DomSanitizer);
   private destroyRef = inject(DestroyRef);
   private errorTimer?: ReturnType<typeof setTimeout>;
+  private prevClusterArticles = new Map<string, string[]>();
 
   constructor() {
     effect(() => {
@@ -57,6 +59,36 @@ export class InboxComponent {
         setTimeout(() => (document.querySelector('.help-modal button') as HTMLElement)?.focus());
       }
     });
+
+    // Remap expanded clusters when cluster IDs change (e.g. after save/delete shifts shared tags)
+    effect(() => {
+      const newClusters = this.clusters();
+      const expanded = this.expandedClusters();
+      const prevMap = this.prevClusterArticles;
+
+      const newIdSet = new Set(newClusters.map(c => c.id));
+      const lost = [...expanded].filter(id => !newIdSet.has(id));
+
+      if (lost.length > 0) {
+        const updated = new Set(expanded);
+        for (const lostId of lost) {
+          updated.delete(lostId);
+          const oldArticleIds = prevMap.get(lostId);
+          if (oldArticleIds) {
+            const successor = newClusters.find(c =>
+              c.articles.some(a => oldArticleIds.includes(a.id))
+            );
+            if (successor) updated.add(successor.id);
+          }
+        }
+        this.expandedClusters.set(updated);
+      }
+
+      prevMap.clear();
+      for (const c of newClusters) {
+        prevMap.set(c.id, c.articles.map(a => a.id));
+      }
+    }, { allowSignalWrites: true });
   }
 
   loading = signal(false);
@@ -341,7 +373,6 @@ export class InboxComponent {
   bulkDelete(): void {
     const ids = [...this.selectedIds()];
     if (ids.length === 0) return;
-    if (!confirm(`Delete ${ids.length} article${ids.length > 1 ? 's' : ''}?`)) return;
 
     this.deleting.set(true);
     this.error.set(null);
@@ -473,7 +504,6 @@ export class InboxComponent {
 
   deleteArticle(article: Article): void {
     if (this.deletingIds().has(article.id)) return;
-    if (!confirm(`Delete "${article.title}"?`)) return;
 
     this.deletingIds.update(set => new Set(set).add(article.id));
 
@@ -658,8 +688,34 @@ export class InboxComponent {
   clusterSynthesis = signal<Record<string, string>>({});
   synthesizingCluster = signal<string | null>(null);
 
-  clusters = computed(() => clusterArticles(this.filteredArticles()));
+  private clusterVersion = signal(0);
+  clusters = computed(() => {
+    this.clusterVersion(); // track to allow manual refresh
+    return clusterArticles(this.filteredArticles());
+  });
   unclusteredArticles = computed(() => getUnclusteredArticles(this.filteredArticles(), this.clusters()));
+  clusteredArticleCount = computed(() => this.clusters().reduce((sum, c) => sum + c.articles.length, 0));
+
+  refreshClusters(): void {
+    this.clusterVersion.update(v => v + 1);
+  }
+
+  isClusterAllSelected(cluster: Cluster): boolean {
+    const sel = this.selectedIds();
+    return cluster.articles.length > 0 && cluster.articles.every(a => sel.has(a.id));
+  }
+
+  toggleClusterSelectAll(cluster: Cluster): void {
+    const allSelected = this.isClusterAllSelected(cluster);
+    this.selectedIds.update(set => {
+      const next = new Set(set);
+      for (const a of cluster.articles) {
+        if (allSelected) next.delete(a.id);
+        else next.add(a.id);
+      }
+      return next;
+    });
+  }
 
   toggleClusterExpand(clusterId: string): void {
     this.expandedClusters.update(set => {
@@ -687,6 +743,28 @@ export class InboxComponent {
         this.error.set('Failed to synthesize cluster');
         this.synthesizingCluster.set(null);
       },
+    });
+  }
+
+  saveCluster(cluster: Cluster): void {
+    const ids = cluster.articles.map(a => a.id);
+    this.service.saveArticles(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        const savedSet = new Set(ids);
+        this.articles.update(list => list.filter(a => !savedSet.has(a.id)));
+      },
+      error: () => this.error.set('Failed to save cluster articles'),
+    });
+  }
+
+  deleteCluster(cluster: Cluster): void {
+    const ids = cluster.articles.map(a => a.id);
+    this.service.bulkDelete(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        const deletedSet = new Set(ids);
+        this.articles.update(list => list.filter(a => !deletedSet.has(a.id)));
+      },
+      error: () => this.error.set('Failed to delete cluster articles'),
     });
   }
 

@@ -201,9 +201,35 @@
     <!-- Cluster view -->
     @if (viewMode() === 'clusters') {
       <section class="clusters-section">
+        <div class="clusters-toolbar">
+          <span class="clusters-info">
+            {{ clusters().length }} cluster{{ clusters().length !== 1 ? 's' : '' }}
+            &middot; {{ clusteredArticleCount() }} grouped
+            &middot; {{ unclusteredArticles().length }} unclustered
+          </span>
+          <button class="btn btn-sm" (click)="refreshClusters()" style="border: 1px solid #e2e8f0;">
+            Refresh clusters
+          </button>
+        </div>
         @if (clusters().length === 0) {
           <div class="empty-state">No clusters found (articles need to share at least 2 tags).</div>
         }
+
+        <!-- Bulk bar for cluster selections -->
+        @if (selectedCount() > 0) {
+          <div class="bulk-bar">
+            <span>{{ selectedCount() }} selected</span>
+            <div class="bulk-actions">
+              <button class="btn btn-success btn-sm" (click)="bulkSave()" [disabled]="saving() || deleting()">
+                {{ saving() ? 'Saving...' : 'Save selected' }}
+              </button>
+              <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="deleting() || saving()">
+                {{ deleting() ? 'Deleting...' : 'Delete selected' }}
+              </button>
+            </div>
+          </div>
+        }
+
         @for (cluster of clusters(); track cluster.id) {
           <div class="cluster-card">
             <div class="cluster-header" role="button" tabindex="0" (click)="toggleClusterExpand(cluster.id)" (keydown.enter)="toggleClusterExpand(cluster.id)" (keydown.space)="toggleClusterExpand(cluster.id); $event.preventDefault()">
@@ -212,7 +238,7 @@
               <span class="cluster-article-count">{{ cluster.articles.length }} articles</span>
               <div class="cluster-tags">
                 @for (tag of cluster.sharedTags; track tag) {
-                  <span class="badge badge-tag">{{ tag }}</span>
+                  <span [class]="tagBadgeClass(tag)">{{ tag }}</span>
                 }
               </div>
             </div>
@@ -222,6 +248,12 @@
                   <button class="btn btn-sm btn-primary" (click)="saveBestArchiveRest(cluster); $event.stopPropagation()">
                     Save best + archive rest
                   </button>
+                  <button class="btn btn-sm btn-success" (click)="saveCluster(cluster); $event.stopPropagation()">
+                    Save all
+                  </button>
+                  <button class="btn btn-sm btn-danger" (click)="deleteCluster(cluster); $event.stopPropagation()">
+                    Delete all
+                  </button>
                   <button class="btn btn-sm" (click)="synthesizeCluster(cluster); $event.stopPropagation()" [disabled]="synthesizingCluster() === cluster.id" style="border: 1px solid #e2e8f0;">
                     {{ synthesizingCluster() === cluster.id ? 'Synthesizing...' : 'Synthesize' }}
                   </button>
@@ -230,13 +262,32 @@
                   <div class="cluster-synthesis" [innerHTML]="clusterSynthesis()[cluster.id]"></div>
                 }
                 <ul class="cluster-articles">
+                  <li class="cluster-select-all">
+                    <input
+                      type="checkbox"
+                      [checked]="isClusterAllSelected(cluster)"
+                      (change)="toggleClusterSelectAll(cluster)"
+                      title="Select all in cluster"
+                    />
+                    <span>Select all</span>
+                  </li>
                   @for (article of cluster.articles; track article.id) {
-                    <li>
+                    <li [class.row-deleting]="isBusy(article.id)" [class.row-selected]="isSelected(article.id)">
+                      <input
+                        type="checkbox"
+                        [checked]="isSelected(article.id)"
+                        (change)="toggleSelect(article.id)"
+                      />
+                      <span class="cluster-article-date">[{{ article.publishedAt | date:'yyyy-MM-dd' }}]</span>
                       <a [href]="article.url" target="_blank" rel="noopener">{{ article.title }}</a>
                       <span class="article-source">{{ article.feedSource }}</span>
                       @if (article.relevanceScore) {
                         <span class="score-badge" [class.score-high]="article.relevanceScore >= 7" [class.score-low]="article.relevanceScore <= 3">{{ article.relevanceScore }}</span>
                       }
+                      <span class="cluster-article-actions">
+                        <button class="btn-icon btn-icon-success" title="Save" (click)="saveArticle(article)" [disabled]="isBusy(article.id)">&#9733;</button>
+                        <button class="btn-icon btn-icon-danger" title="Delete" (click)="deleteArticle(article)" [disabled]="isBusy(article.id)">&#10005;</button>
+                      </span>
                     </li>
                   }
                 </ul>
