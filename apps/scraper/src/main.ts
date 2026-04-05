@@ -43,8 +43,8 @@ function isWithinScheduledWindow(): boolean {
   const minute = parseInt(parisTime.find(p => p.type === 'minute')?.value || '0', 10);
   const totalMinutes = hour * 60 + minute;
 
-  // Every 2h from 7h to 21h: 7, 9, 11, 13, 15, 17, 19, 21
-  const validWindows = [7, 9, 11, 13, 15, 17, 19, 21].map(h => h * 60);
+  // Every 3h from 7h to 22h: 7, 10, 13, 16, 19, 22
+  const validWindows = [7, 10, 13, 16, 19, 22].map(h => h * 60);
   return validWindows.some(window => Math.abs(totalMinutes - window) <= 15);
 }
 
