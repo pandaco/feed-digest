@@ -1,6 +1,6 @@
 # Development Guide — feed-digest
 
-This guide explains how to set up, run, and test the **feed-digest** project locally, including how to simulate the Telegram webhook without deploying to AWS.
+This guide explains how to set up, run, and test the **feed-digest** project locally.
 
 ---
 
@@ -9,7 +9,7 @@ This guide explains how to set up, run, and test the **feed-digest** project loc
 ### 1.1 Prerequisites
 - **Node.js**: v22 or higher.
 - **NX CLI**: Installed globally (`npm install -g nx`) or use `npx nx`.
-- **Playwright**: Installed and browsers initialized (for InoreaderAdapter).
+- **Playwright**: Installed and browsers initialized (for InoreaderScraper).
 - **Storage backend** (pick one):
   - **Google Sheets**: a Google service account with access to the target Sheet.
   - **Notion**: a Notion integration with access to the 3 databases (Inbox, All, Saved).
@@ -43,8 +43,6 @@ Fill in the following variables in `.env`:
   - `GOOGLE_SHEET_ID`
   - Run `npm run setup` to create the tabs and headers automatically
 - If `STORAGE_BACKEND=notion`:
-  - Run `npm run setup` to create all required properties in the 3 databases
-- If `STORAGE_BACKEND=notion`:
   - `NOTION_API_KEY`
   - `NOTION_INBOX_DB_ID`, `NOTION_ALL_DB_ID`, `NOTION_SAVED_DB_ID`
   - Run `npm run setup` to provision the Notion database schema
@@ -54,12 +52,12 @@ Fill in the following variables in `.env`:
 - `STORAGE_BACKEND` (`google-sheets` or `notion`, default: `google-sheets`)
 - `SHOW_BROWSER` (set to `true` to show Playwright browser window)
 - `RUN_NOW` (set to `true` to bypass the Paris time window guard)
-- `DYNAMODB_TABLE_NAME` (optional for local, see below)
+- `DYNAMODB_ARTICLES_TABLE_NAME` (optional for local, see below)
 - `DYNAMODB_TAG_PREF_TABLE_NAME` (optional for local, see below)
 - `TAG_PREFERENCE_THRESHOLD` (default: `0.6` — minimum score for auto-selection)
 - `TAG_PREFERENCE_MIN_RUNS` (default: `3` — minimum presentations before auto-selection kicks in)
 - `USER_INTERESTS` (free-text interest profile for LLM relevance scoring, also editable via dashboard)
-- `API_PORT` (default: `3333` — port for the local Express API server)
+- `API_PORT` (default: `3333` — port for the local NestJS API server)
 
 ---
 
@@ -92,28 +90,19 @@ This script fetches each article's source URL, extracts the real publication dat
 
 ---
 
-## 3. Testing the Webhook Locally (Interactivity)
+## 3. Running the Dashboard API locally
 
-To test the tag filtering logic on your phone without deploying to AWS and without using Ngrok, we use **Polling mode**. In this mode, your computer actively asks Telegram for new clicks.
+To serve the dashboard and its backend API locally:
 
-### Step 1: Launch the Dev Environment
 ```bash
-npm run webhook
-```
-This command will start the **Polling Server** (it stays active to listen for your clicks).
+# Start the NestJS API
+npm run api
 
-### Step 2: Use your phone
-1. Wait for the bot to send you the summary.
-2. Click on the tag buttons.
-3. You will see `[Polling] Received click` in your terminal.
-4. Click **"Validate selection"**.
-5. Check your storage: the articles will be filtered in real-time!
-
-### Troubleshooting Polling
-If you previously configured a Webhook (e.g., via Ngrok or a previous deploy), Polling might be blocked. To reset your bot to a "clean" state, run this command:
-```bash
-curl https://api.telegram.org/bot<YOUR_BOT_TOKEN>/deleteWebhook
+# In another terminal, start the Angular dashboard
+npx nx serve dashboard
 ```
+
+The API will be available at `http://localhost:3333/api` and the dashboard at `http://localhost:4200`.
 
 ---
 
@@ -169,22 +158,24 @@ Set `NOTION_INBOX_DB_ID`, `NOTION_ALL_DB_ID`, and `NOTION_SAVED_DB_ID` in `.env`
 
 ## 5. Tag Preference Learning
 
-The system learns from your tag selections to auto-check your favorite tags in future runs.
+The system learns from your interactions in the dashboard to determine which tags you are most interested in. This information is used during the enrichment phase to compute the **Importance** level of each article.
 
 **How it works:**
-- Each time you validate a tag selection, the system records which tags were selected and which were not. A run counter is incremented on each validation.
+- Each time you "Save" or "Delete" an article in the dashboard, the system records the associated tags.
 - A score is computed for each tag: `selectionCount / presentedCount`.
-- When the score exceeds the threshold (`TAG_PREFERENCE_THRESHOLD`, default `0.6`) and the tag has been presented enough times (`TAG_PREFERENCE_MIN_RUNS`, default `3`), the tag is automatically pre-checked in the Telegram keyboard.
-- Pre-checked tags appear first in the list, sorted by frequency.
-- You can always toggle tags manually before validating.
+- During the pipeline run, the **Importance** of an article is determined by its tags:
+   - At least one tag with an `auto` override or a high selection score (`> TAG_PREFERENCE_THRESHOLD`) → **High**
+   - All tags are marked as `filtered` → **Low**
+   - Otherwise → **Medium**
+- High-importance articles are highlighted in the Telegram summary.
 
 **Tag overrides:**
 Each tag can have a manual override that takes precedence over the score-based logic:
-- **`auto`**: the tag is always pre-selected, regardless of its score.
-- **`filtered`**: the tag is completely hidden from the Telegram notification keyboard.
+- **`auto`**: the tag always contributes to "High" importance.
+- **`filtered`**: the tag is hidden from the dashboard and contributes to "Low" importance if all other tags are also filtered.
 - **`default`** (no override): standard threshold-based behavior.
 
-Overrides are managed via the dashboard or the REST API.
+Overrides are managed via the **Tag Preferences** tab in the dashboard.
 
 **Local development:** preferences are stored in `tag-preferences.json` at the project root.
 **Production:** preferences are stored in a dedicated DynamoDB table (`DYNAMODB_TAG_PREF_TABLE_NAME`).
@@ -253,7 +244,7 @@ The app will be available at `http://localhost:4200`.
 - Direct link to original article
 
 ### API Endpoints
-The dashboard connects to the webhook Lambda's REST API:
+The dashboard connects to the NestJS REST API:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -332,14 +323,14 @@ Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployme
 ## 9. Project Architecture Reminder
 - **libs/core**: Pure domain logic, models, and port interfaces. No external dependencies.
 - **libs/adapters**: Concrete implementations:
-  - `scraper/inoreader.adapter.ts` — InoReader scraping via Playwright
-  - `storage/google-sheets.adapter.ts` — Google Sheets storage
-  - `storage/notion.adapter.ts` — Notion database storage
-  - `llm/claude.adapter.ts` / `llm/gemini.adapter.ts` — LLM enrichment
-  - `notifier/telegram.adapter.ts` — Telegram notifications
+  - `scraper/inoreader.scraper.ts` — InoReader scraping via Playwright
+  - `storage/google-sheets.storage.ts` — Google Sheets storage
+  - `storage/notion.storage.ts` — Notion database storage
+  - `llm/claude.llm.ts` / `llm/gemini.llm.ts` — LLM enrichment
+  - `notifier/telegram.notifier.ts` — Telegram notifications
   - `session/dynamodb.adapter.ts` / `session/in-memory-session.adapter.ts` — Session persistence
-  - `tag-preference/dynamodb-tag-preference.adapter.ts` / `tag-preference/file-tag-preference.adapter.ts` — Tag preference learning
+  - `tag-preference/dynamodb.tag-preference.ts` / `tag-preference/file.tag-preference.ts` — Tag preference learning
 - **libs/pipeline**: Orchestration (the "Glue") between the ports.
 - **apps/scraper**: CLI entry point (composition root).
-- **apps/webhook**: AWS Lambda handler for Telegram callbacks + REST API (preferences, inbox, saved, snooze, interests, article content/TOC).
+- **apps/api**: NestJS API server (dashboard backend + AWS Lambda handler).
 - **apps/dashboard**: Angular web UI: inbox browser (with clustering, snooze, relevance scores), saved articles, triage, tag preferences, snoozed articles, user interests, focus mode reader.
