@@ -299,6 +299,17 @@ export async function runPipeline(options: RunPipelineOptions): Promise<void> {
     const failedCount = metadata.length - enrichedArticles.length;
     console.log(`[Pipeline] Finished processing. (Saved: ${enrichedArticles.length}, Failed: ${failedCount})`);
 
+    // Automatic purge of expired articles in ALL collection
+    const retentionDays = parseInt(process.env['RETENTION_DAYS_ALL'] || '30', 10);
+    try {
+      const purgedCount = await options.storage.purgeExpiredArticles(retentionDays);
+      if (purgedCount > 0) {
+        console.log(`[Pipeline] Automatically purged ${purgedCount} expired articles from ALL collection.`);
+      }
+    } catch (purgeError) {
+      console.error('[Pipeline] Failed to purge expired articles:', purgeError);
+    }
+
     const llmUsage = options.llm.getUsage();
     await sendNotifications(options, enrichedArticles, remaining, runAtDate, {
       articlesCollected: rawMetadata.length,

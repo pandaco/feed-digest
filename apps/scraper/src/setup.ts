@@ -7,7 +7,13 @@
  */
 import * as dotenv from 'dotenv';
 import { google } from 'googleapis';
-import { DynamoDBClient, CreateTableCommand, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
+import {
+  DynamoDBClient,
+  CreateTableCommand,
+  DescribeTableCommand,
+  UpdateTimeToLiveCommand,
+  DescribeTimeToLiveCommand
+} from '@aws-sdk/client-dynamodb';
 
 dotenv.config();
 
@@ -18,7 +24,6 @@ dotenv.config();
 async function setupDynamoDb(): Promise<void> {
   const region = process.env['AWS_REGION'] || 'eu-central-1';
   const endpoint = process.env['DYNAMODB_ENDPOINT'];
-
   const articlesTable = process.env['DYNAMODB_ARTICLES_TABLE_NAME'];
   const tagPrefsTable = process.env['DYNAMODB_TAG_PREF_TABLE_NAME'];
 
@@ -38,6 +43,20 @@ async function setupDynamoDb(): Promise<void> {
   try {
     await client.send(new DescribeTableCommand({ TableName: articlesTable }));
     console.log(`  ✅ Articles table "${articlesTable}" already exists.`);
+
+    // Ensure TTL is enabled even if table already existed
+    const ttl = await client.send(new DescribeTimeToLiveCommand({ TableName: articlesTable }));
+    if (ttl.TimeToLiveDescription?.TimeToLiveStatus !== 'ENABLED') {
+      console.log(`  ⏳ Enabling TTL on "expiresAt" attribute for existing table...`);
+      await client.send(new UpdateTimeToLiveCommand({
+        TableName: articlesTable,
+        TimeToLiveSpecification: { AttributeName: 'expiresAt', Enabled: true },
+      }));
+      console.log(`  ✓ TTL update requested.`);
+    } else {
+      console.log(`  ✅ TTL is already enabled on "expiresAt".`);
+    }
+
   } catch (err: any) {
     if (err.name === 'ResourceNotFoundException' || err.__type?.endsWith('ResourceNotFoundException')) {
       console.log(`  ➕ Creating articles table "${articlesTable}"...`);
@@ -64,6 +83,14 @@ async function setupDynamoDb(): Promise<void> {
         BillingMode: 'PAY_PER_REQUEST',
       }));
       console.log(`  ✓ Articles table created.`);
+
+      // Enable TTL on new table
+      console.log(`  ⏳ Enabling TTL on "expiresAt" attribute...`);
+      await client.send(new UpdateTimeToLiveCommand({
+        TableName: articlesTable,
+        TimeToLiveSpecification: { AttributeName: 'expiresAt', Enabled: true },
+      }));
+      console.log(`  ✓ TTL enabled.`);
     } else {
       throw err;
     }

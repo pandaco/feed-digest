@@ -71,6 +71,13 @@ export class DynamoDbStorage implements StoragePort {
     await this.deleteFromCollection(articleIds, 'SAVED');
   }
 
+  async purgeExpiredArticles(days: number): Promise<number> {
+    // No-op for AWS DynamoDB as it handles TTL natively via the 'expiresAt' attribute.
+    // The attribute is added in articleToItem().
+    console.log(`[DynamoDbStorage] Native TTL is enabled (retention: ${days} days). Manual purge skipped.`);
+    return 0;
+  }
+
   // ---------------------------------------------------------------------------
   // Update (snooze, tags, relevance score…)
   // ---------------------------------------------------------------------------
@@ -170,8 +177,17 @@ export class DynamoDbStorage implements StoragePort {
       isSaved: article.isSaved,
       scraperSource: article.scraperSource,
     };
+
     if (article.relevanceScore != null) item['relevanceScore'] = article.relevanceScore;
     if (article.snoozedUntil) item['snoozedUntil'] = article.snoozedUntil;
+
+    // TTL for ALL collection
+    if (collection === 'ALL') {
+      const retentionDays = parseInt(process.env['RETENTION_DAYS_ALL'] || '30', 10);
+      const retentionSeconds = retentionDays * 24 * 60 * 60;
+      item['expiresAt'] = Math.floor(Date.now() / 1000) + retentionSeconds;
+    }
+
     return item;
   }
 

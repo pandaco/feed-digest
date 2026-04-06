@@ -132,6 +132,46 @@ export class GoogleSheetsStorage implements StoragePort {
     });
   }
 
+  async purgeExpiredArticles(days: number): Promise<number> {
+    const response = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: 'All!A:O',
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length <= 1) return 0;
+
+    const headers = rows[0];
+    const dataRows = rows.slice(1);
+
+    const thresholdDate = new Date();
+    thresholdDate.setDate(thresholdDate.getDate() - days);
+
+    const filteredRows = dataRows.filter((row) => {
+      const runAt = new Date(row[1]); // Run At is at index 1
+      return isNaN(runAt.getTime()) || runAt >= thresholdDate;
+    });
+
+    const purgedCount = dataRows.length - filteredRows.length;
+    if (purgedCount === 0) return 0;
+
+    console.log(`[GoogleSheetsStorage] Purging All: ${dataRows.length} rows -> ${filteredRows.length} rows (${purgedCount} purged).`);
+
+    await this.sheets.spreadsheets.values.clear({
+      spreadsheetId: this.spreadsheetId,
+      range: 'All!A:O',
+    });
+
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: 'All!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [headers, ...filteredRows] },
+    });
+
+    return purgedCount;
+  }
+
   private async appendArticles(tab: string, articles: Article[]): Promise<void> {
     if (articles.length === 0) {
       console.log(`[GoogleSheetsStorage] No articles to append to ${tab}.`);

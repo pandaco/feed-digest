@@ -1,72 +1,59 @@
 import { Article } from './article';
 
 /**
- * Port for persistent storage of articles.
- * This interface isolates the domain from specific storage implementations (e.g., Google Sheets).
+ * Port for the storage system (Notion, Google Sheets, DynamoDB).
  */
 export interface StoragePort {
   /**
-   * Appends newly enriched articles to the Inbox tab.
-   * 
-   * @param articles List of articles to append.
+   * Append articles to the inbox.
    */
   appendToInbox(articles: Article[]): Promise<void>;
 
   /**
-   * Appends all processed articles to the permanent history (All tab).
-   * 
-   * @param articles List of articles to append.
-   */
-  appendToAll(articles: Article[]): Promise<void>;
-
-  /**
-   * Removes specific articles from the Inbox tab.
-   * Usually called after user filtering in Telegram.
-   * 
-   * @param articleIds List of article IDs to remove.
-   */
-  deleteFromInbox(articleIds: string[]): Promise<void>;
-
-  /**
-   * Retrieves all articles currently present in the Inbox tab.
-   *
-   * @returns List of articles from the Inbox.
+   * Get all articles from the inbox.
    */
   getFromInbox(): Promise<Article[]>;
 
   /**
-   * Retrieves all articles from the Inbox that have no tags.
-   *
-   * @returns List of untagged articles from the Inbox.
+   * Delete articles from the inbox.
+   * Usually called after user filtering in Telegram.
+   */
+  deleteFromInbox(articleIds: string[]): Promise<void>;
+
+  /**
+   * Get articles from inbox that don't have tags yet.
    */
   getUntaggedArticles(): Promise<Article[]>;
 
   /**
-   * Appends saved/starred articles to the Saved tab.
-   *
-   * @param articles List of saved articles to append.
+   * Append articles to the main list (all processed articles).
+   */
+  appendToAll(articles: Article[]): Promise<void>;
+
+  /**
+   * Update an article's metadata (tags, summary, importance, snooze).
+   * Should update in both Inbox and All collections if article exists in both.
+   */
+  updateArticle(article: Article): Promise<void>;
+
+  /**
+   * Append articles to saved articles.
    */
   appendToSaved(articles: Article[]): Promise<void>;
 
   /**
-   * Retrieves all articles currently present in the Saved tab.
-   *
-   * @returns List of saved articles.
+   * Get all saved articles.
    */
   getFromSaved(): Promise<Article[]>;
 
   /**
-   * Removes specific articles from the Saved tab.
-   *
-   * @param articleIds List of article IDs to remove.
+   * Delete articles from saved articles.
    */
   deleteFromSaved(articleIds: string[]): Promise<void>;
 
   /**
-   * Updates an existing article in the storage (Inbox and All tabs).
-   * Matches by article ID.
-   *
-   * @param article The updated article data.
+   * Delete articles older than X days from the ALL collection.
+   * Returns the number of articles purged.
    */
-  updateArticle(article: Article): Promise<void>;
+  purgeExpiredArticles(days: number): Promise<number>;
 }

@@ -237,6 +237,42 @@ export class NotionStorage implements StoragePort {
     }
   }
 
+  async purgeExpiredArticles(days: number): Promise<number> {
+    const thresholdDate = new Date();
+    thresholdDate.setDate(thresholdDate.getDate() - days);
+    const thresholdIso = thresholdDate.toISOString();
+
+    console.log(`[NotionStorage] Purging articles from All older than ${days} days (before ${thresholdIso})...`);
+
+    let purged = 0;
+    let cursor: string | undefined;
+    const limit = pLimit(5);
+
+    do {
+      const response = await this.queryDatabase(this.allDbId, {
+        property: 'Run At',
+        rich_text: { on_or_before: thresholdIso }
+      }, undefined, cursor);
+
+      const pages = response.results;
+      if (pages.length > 0) {
+        await Promise.all(pages.map((page: any) => limit(async () => {
+          try {
+            await this.client.pages.update({ page_id: page.id, in_trash: true });
+            purged++;
+          } catch (err) {
+            console.error(`[NotionStorage] Failed to purge page ${page.id}:`, err);
+          }
+        })));
+      }
+
+      cursor = response.has_more ? response.next_cursor ?? undefined : undefined;
+    } while (cursor);
+
+    console.log(`[NotionStorage] Purged ${purged} articles from All.`);
+    return purged;
+  }
+
   private mapPageToArticle(props: any): Article {
     return {
       id: this.getRichText(props['Article ID']),
