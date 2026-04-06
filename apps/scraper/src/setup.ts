@@ -18,6 +18,7 @@ dotenv.config();
 async function setupDynamoDb(): Promise<void> {
   const region = process.env['AWS_REGION'] || 'eu-central-1';
   const endpoint = process.env['DYNAMODB_ENDPOINT'];
+
   const articlesTable = process.env['DYNAMODB_ARTICLES_TABLE_NAME'];
   const tagPrefsTable = process.env['DYNAMODB_TAG_PREF_TABLE_NAME'];
 
