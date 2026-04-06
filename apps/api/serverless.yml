@@ -3,7 +3,7 @@ service: feed-digest
 provider:
   name: aws
   runtime: nodejs22.x
-  region: eu-west-1
+  region: eu-central-1
   stage: ${opt:stage, 'prod'}
   environment:
     TELEGRAM_BOT_TOKEN: ${ssm:/feed-digest/${self:provider.stage}/TELEGRAM_BOT_TOKEN}

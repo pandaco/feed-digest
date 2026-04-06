@@ -290,7 +290,7 @@ aws ssm put-parameter \
   --name /feed-digest/prod/TELEGRAM_BOT_TOKEN \
   --value "your-token" \
   --type SecureString \
-  --region eu-west-1
+  --region eu-central-1
 ```
 
 ### 6.2 GitHub Secrets

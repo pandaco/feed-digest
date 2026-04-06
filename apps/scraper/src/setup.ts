@@ -1,14 +1,92 @@
 /**
  * One-shot setup script for storage backends.
- * Provisions the schema (tabs/columns/properties) for the configured backend.
+ * Provisions the schema (tabs/columns/properties/tables) for the configured backend.
  * Safe to run multiple times — existing structure is left unchanged.
  *
  * Usage: npm run setup
  */
 import * as dotenv from 'dotenv';
 import { google } from 'googleapis';
+import { DynamoDBClient, CreateTableCommand, DescribeTableCommand } from '@aws-sdk/client-dynamodb';
 
 dotenv.config();
+
+// ---------------------------------------------------------------------------
+// DynamoDB
+// ---------------------------------------------------------------------------
+
+async function setupDynamoDb(): Promise<void> {
+  const region = process.env['AWS_REGION'] || 'eu-central-1';
+  const endpoint = process.env['DYNAMODB_ENDPOINT'];
+  const articlesTable = process.env['DYNAMODB_ARTICLES_TABLE_NAME'];
+  const tagPrefsTable = process.env['DYNAMODB_TAG_PREF_TABLE_NAME'];
+
+  if (!articlesTable || !tagPrefsTable) {
+    console.error('[setup] Missing DynamoDB env vars: DYNAMODB_ARTICLES_TABLE_NAME, DYNAMODB_TAG_PREF_TABLE_NAME');
+    process.exit(1);
+  }
+
+  const client = new DynamoDBClient({
+    region,
+    ...(endpoint ? { endpoint } : {}),
+  });
+
+  console.log(`\n[setup] Provisioning DynamoDB tables (Region: ${region}${endpoint ? `, Endpoint: ${endpoint}` : ''})...`);
+
+  // 1. Articles Table
+  try {
+    await client.send(new DescribeTableCommand({ TableName: articlesTable }));
+    console.log(`  ✅ Articles table "${articlesTable}" already exists.`);
+  } catch (err: any) {
+    if (err.name === 'ResourceNotFoundException' || err.__type?.endsWith('ResourceNotFoundException')) {
+      console.log(`  ➕ Creating articles table "${articlesTable}"...`);
+      await client.send(new CreateTableCommand({
+        TableName: articlesTable,
+        AttributeDefinitions: [
+          { AttributeName: 'PK', AttributeType: 'S' },
+          { AttributeName: 'SK', AttributeType: 'S' },
+          { AttributeName: 'GSI1PK', AttributeType: 'S' },
+          { AttributeName: 'GSI1SK', AttributeType: 'S' },
+        ],
+        KeySchema: [
+          { AttributeName: 'PK', KeyType: 'HASH' },
+          { AttributeName: 'SK', KeyType: 'RANGE' },
+        ],
+        GlobalSecondaryIndexes: [{
+          IndexName: 'GSI1',
+          KeySchema: [
+            { AttributeName: 'GSI1PK', KeyType: 'HASH' },
+            { AttributeName: 'GSI1SK', KeyType: 'RANGE' },
+          ],
+          Projection: { ProjectionType: 'ALL' },
+        }],
+        BillingMode: 'PAY_PER_REQUEST',
+      }));
+      console.log(`  ✓ Articles table created.`);
+    } else {
+      throw err;
+    }
+  }
+
+  // 2. Tag Preferences Table
+  try {
+    await client.send(new DescribeTableCommand({ TableName: tagPrefsTable }));
+    console.log(`  ✅ Tag preferences table "${tagPrefsTable}" already exists.`);
+  } catch (err: any) {
+    if (err.name === 'ResourceNotFoundException' || err.__type?.endsWith('ResourceNotFoundException')) {
+      console.log(`  ➕ Creating tag preferences table "${tagPrefsTable}"...`);
+      await client.send(new CreateTableCommand({
+        TableName: tagPrefsTable,
+        AttributeDefinitions: [{ AttributeName: 'chatId', AttributeType: 'S' }],
+        KeySchema: [{ AttributeName: 'chatId', KeyType: 'HASH' }],
+        BillingMode: 'PAY_PER_REQUEST',
+      }));
+      console.log(`  ✓ Tag preferences table created.`);
+    } else {
+      throw err;
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Notion
@@ -174,6 +252,8 @@ async function main(): Promise<void> {
 
   if (backend === 'notion') {
     await setupNotion();
+  } else if (backend === 'dynamodb') {
+    await setupDynamoDb();
   } else {
     await setupGoogleSheets();
   }

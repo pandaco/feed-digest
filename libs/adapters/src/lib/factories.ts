@@ -24,7 +24,7 @@ export function createStorage(label = 'App'): StoragePort {
       });
     case 'dynamodb':
       return new DynamoDbStorage({
-        region: process.env['AWS_REGION'] || 'eu-west-1',
+        region: process.env['AWS_REGION'] || 'eu-central-1',
         tableName: process.env['DYNAMODB_ARTICLES_TABLE_NAME']!,
         endpoint: process.env['DYNAMODB_ENDPOINT'],
       });
@@ -49,7 +49,7 @@ export function createTagPreference(): TagPreferencePort {
   return process.env['NODE_ENV'] === 'development'
     ? new FileTagPreference()
     : new DynamoDbTagPreference({
-        region: process.env['AWS_REGION'] || 'eu-west-1',
+        region: process.env['AWS_REGION'] || 'eu-central-1',
         tableName: process.env['DYNAMODB_TAG_PREF_TABLE_NAME']!,
       });
 }

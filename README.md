@@ -61,7 +61,7 @@ npm run fix-dates
 | `DYNAMODB_ARTICLES_TABLE_NAME` | DynamoDB table for articles (if `dynamodb`) | - |
 | `DYNAMODB_TAG_PREF_TABLE_NAME` | DynamoDB table for tag preferences (prod) | - |
 | `DYNAMODB_ENDPOINT` | DynamoDB endpoint override (e.g. `http://localhost:8000` for local) | - |
-| `AWS_REGION` | AWS region for DynamoDB | `eu-west-1` |
+| `AWS_REGION` | AWS region for DynamoDB | `eu-central-1` |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram bot configuration | - |
 | `SUMMARY_LANG` | Summary and message language (`fr`, `en`) | `fr` |
 | `SCRAPER_SOURCE` | Scraping sources, comma-separated (`inoreader`, `inoreader-saved`) | `inoreader` |
