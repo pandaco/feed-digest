@@ -86,7 +86,7 @@ npm run fix-dates
    - Otherwise → **medium**
 4. **Storage**: all articles go to Inbox + All. Storage backend is configurable via `STORAGE_BACKEND` (`google-sheets`, `notion`, or `dynamodb`). For `inoreader-saved`, processed articles are unstarred on InoReader. Articles also store `relevanceScore` and optional `snoozedUntil` fields.
 5. **Telegram notification**: a single rich summary message with pipeline funnel (collected → deduped → noise-filtered → processed), importance breakdown (high/medium/low), average relevance score, top 5 sources, LLM usage (calls + tokens in/out), and run duration.
-6. **Preference learning**: tag preferences are learned from dashboard interactions. Tags can be manually overridden to `auto` (always pre-selected) or `filtered` (hidden) via the dashboard.
+6. **Preference learning**: tag preferences are learned from dashboard interactions. Tags can be manually overridden to `auto` (boosts importance to High) or `filtered` (hides article/lowers importance) via the dashboard.
 
 ## Dashboard
 
