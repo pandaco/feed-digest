@@ -59,6 +59,12 @@ jobs:
       - name: Run scraper
         run: node dist/apps/scraper/main.js
         env:
+          # --- AWS Secrets ---
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          DYNAMODB_ARTICLES_TABLE_NAME: ${{ secrets.DYNAMODB_ARTICLES_TABLE_NAME }}
+          DYNAMODB_TAG_PREF_TABLE_NAME: ${{ secrets.DYNAMODB_TAG_PREF_TABLE_NAME }}
           # --- Secrets ---
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
