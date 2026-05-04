@@ -30,30 +30,7 @@ function createScraper(): ScraperPort {
   return new CompositeScraper(sources.map(createSingleScraper));
 }
 
-function isWithinScheduledWindow(): boolean {
-  const now = new Date();
-  const parisTime = new Intl.DateTimeFormat('fr-FR', {
-    timeZone: 'Europe/Paris',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
-  }).formatToParts(now);
-
-  const hour = parseInt(parisTime.find(p => p.type === 'hour')?.value || '0', 10);
-  const minute = parseInt(parisTime.find(p => p.type === 'minute')?.value || '0', 10);
-  const totalMinutes = hour * 60 + minute;
-
-  // Every 3h from 7h to 22h: 7, 10, 13, 16, 19, 22
-  const validWindows = [7, 10, 13, 16, 19, 22].map(h => h * 60);
-  return validWindows.some(window => Math.abs(totalMinutes - window) <= 15);
-}
-
 async function main() {
-  if (!isWithinScheduledWindow() && process.env['RUN_NOW'] !== 'true') {
-    console.log('[Main] Outside of scheduled window. Skipping run.');
-    return;
-  }
-
   const summaryLang = process.env['SUMMARY_LANG'] || 'fr';
   const scraper = createScraper();
   const storage = createStorage('Main');

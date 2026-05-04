@@ -3,26 +3,8 @@ name: InoReader Scraper
 
 on:
   schedule:
-    # Every 3h from 07:00 to 22:00 Paris time — winter (UTC+1) and summer (UTC+2)
-    - cron: '0 6 * * *'    # 07:00 winter
-    - cron: '0 5 * * *'    # 07:00 summer
-    - cron: '0 9 * * *'    # 10:00 winter
-    - cron: '0 8 * * *'    # 10:00 summer
-    - cron: '0 12 * * *'   # 13:00 winter
-    - cron: '0 11 * * *'   # 13:00 summer
-    - cron: '0 15 * * *'   # 16:00 winter
-    - cron: '0 14 * * *'   # 16:00 summer
-    - cron: '0 18 * * *'   # 19:00 winter
-    - cron: '0 17 * * *'   # 19:00 summer
-    - cron: '0 21 * * *'   # 22:00 winter
-    - cron: '0 20 * * *'   # 22:00 summer
+    - cron: '0 7-22 * * *'
   workflow_dispatch:
-    inputs:
-      run_now:
-        description: 'Bypass timezone guard and run now'
-        required: false
-        default: 'false'
-        type: boolean
 
 jobs:
   scrape:
@@ -93,7 +75,6 @@ jobs:
           USER_INTERESTS: ${{ vars.USER_INTERESTS }}
           # --- Static ---
           NODE_ENV: development
-          RUN_NOW: ${{ inputs.run_now || 'false' }}
           TZ: Europe/Paris
 
       - name: Save local data (session + tag preferences)
