@@ -5,6 +5,11 @@ on:
   schedule:
     - cron: '0 7-22 * * *'
   workflow_dispatch:
+    inputs:
+      articles_limit:
+        description: 'Number of articles to scrape'
+        required: false
+        default: '50'
 
 jobs:
   scrape:
@@ -62,7 +67,7 @@ jobs:
           # --- Variables ---
           LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
           SUMMARY_LANG: ${{ vars.SUMMARY_LANG }}
-          ARTICLES_LIMIT: ${{ vars.ARTICLES_LIMIT }}
+          ARTICLES_LIMIT: ${{ github.event.inputs.articles_limit || vars.ARTICLES_LIMIT || '50' }}
           MAX_TAGS: ${{ vars.MAX_TAGS }}
           PIPELINE_CONCURRENCY: ${{ vars.PIPELINE_CONCURRENCY }}
           PIPELINE_MIN_DELAY_MS: ${{ vars.PIPELINE_MIN_DELAY_MS }}
