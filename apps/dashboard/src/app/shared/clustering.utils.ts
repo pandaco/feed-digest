@@ -86,7 +86,7 @@ export function clusterArticles(articles: Article[]): Cluster[] {
   const clusters: Cluster[] = [];
 
   function splitGroup(group: Article[], minShared: number): void {
-    if (group.length < 2) return;
+    if (group.length < 5) return;
 
     // If group is small enough or we can't split further, emit it
     if (group.length <= MAX_CLUSTER_SIZE || minShared > 5) {
@@ -96,7 +96,7 @@ export function clusterArticles(articles: Article[]): Cluster[] {
 
     // Try splitting with a higher threshold
     const subGroups = unionFindGroups(group, minShared + 1);
-    const multiGroups = subGroups.filter(g => g.length >= 2);
+    const multiGroups = subGroups.filter(g => g.length >= 5);
 
     if (multiGroups.length <= 1) {
       // Higher threshold didn't split — accept as-is
@@ -113,7 +113,7 @@ export function clusterArticles(articles: Article[]): Cluster[] {
   // Initial pass with minShared = 2
   const initialGroups = unionFindGroups(articles, 2);
   for (const group of initialGroups) {
-    if (group.length < 2) continue;
+    if (group.length < 5) continue;
     splitGroup(group, 2);
   }
 
