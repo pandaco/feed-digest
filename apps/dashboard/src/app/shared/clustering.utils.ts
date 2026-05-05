@@ -89,7 +89,7 @@ export function clusterArticles(articles: Article[]): Cluster[] {
     if (group.length < 5) return;
 
     // If group is small enough or we can't split further, emit it
-    if (group.length <= MAX_CLUSTER_SIZE || minShared > 5) {
+    if (group.length <= MAX_CLUSTER_SIZE || minShared > 20) {
       clusters.push(buildCluster(group));
       return;
     }
