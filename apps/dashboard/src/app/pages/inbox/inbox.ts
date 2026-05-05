@@ -6,7 +6,7 @@ import { RouterLink } from '@angular/router';
 import { InboxService, Article } from '../../services/inbox.service';
 import { TagPreferenceService } from '../../services/tag-preference.service';
 import { AuthService } from '../../services/auth.service';
-import { ClusterConfigService } from '../../services/cluster-config.service';
+import { ClusterConfigService, ClusterConfig } from '../../services/cluster-config.service';
 import { formatDate } from '../../shared/format';
 import { getSnoozePresets, SnoozePreset } from '../../shared/snooze.utils';
 import { clusterArticles, getUnclusteredArticles, Cluster } from '../../shared/clustering.utils';
@@ -731,10 +731,13 @@ export class InboxComponent {
     }
   }
 
+  updateClusterConfig(updates: Partial<ClusterConfig>): void {
+    this.configService.updateConfig({ ...this.configService.config(), ...updates });
+  }
+
   // Clustering
   viewMode = signal<'list' | 'clusters'>('list');
   expandedClusters = signal<Set<string>>(new Set());
-import { ClusterConfigService } from '../../services/cluster-config.service';
 
 // ... (dans la classe InboxComponent)
   private configService = inject(ClusterConfigService);
