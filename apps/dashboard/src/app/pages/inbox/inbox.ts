@@ -607,6 +607,8 @@ export class InboxComponent {
   // Keyboard shortcuts
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent): void {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'r') return;
+
     if (this.showHelp()) {
       if (event.key === 'Escape' || event.key === '?') {
         this.showHelp.set(false);

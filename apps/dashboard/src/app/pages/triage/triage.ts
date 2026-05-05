@@ -114,6 +114,8 @@ export class TriageComponent {
 
   @HostListener('document:keydown', ['$event'])
   handleKeyDown(event: KeyboardEvent): void {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'r') return;
+
     if (this.showHelp()) {
       if (event.key === 'Escape' || event.key === '?') {
         this.showHelp.set(false);
