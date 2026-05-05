@@ -33,7 +33,7 @@ export class InboxComponent {
   private service = inject(InboxService);
   private prefService = inject(TagPreferenceService);
   private auth = inject(AuthService);
-  private configService = inject(ClusterConfigService);
+  protected configService = inject(ClusterConfigService);
   private sanitizer = inject(DomSanitizer);
   private destroyRef = inject(DestroyRef);
   private errorTimer?: ReturnType<typeof setTimeout>;
@@ -738,10 +738,6 @@ export class InboxComponent {
   // Clustering
   viewMode = signal<'list' | 'clusters'>('list');
   expandedClusters = signal<Set<string>>(new Set());
-
-// ... (dans la classe InboxComponent)
-  private configService = inject(ClusterConfigService);
-
   clusterSynthesis = signal<Record<string, string>>({});
   synthesizingCluster = signal<string | null>(null);
 
