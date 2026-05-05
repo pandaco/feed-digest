@@ -7,7 +7,7 @@ export interface Cluster {
   label: string;
 }
 
-const MAX_CLUSTER_SIZE = 30;
+const MAX_CLUSTER_SIZE = 50;
 
 /**
  * Union-find clustering: articles sharing >= minShared tags are merged.
