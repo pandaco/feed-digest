@@ -9,21 +9,6 @@
     </div>
   </div>
 
-  <div class="cluster-config">
-    <label>
-      Min Tags:
-      <input type="number" [ngModel]="configService.config().minSharedTags" (ngModelChange)="updateClusterConfig({minSharedTags: $event})">
-    </label>
-    <label>
-      Min Articles:
-      <input type="number" [ngModel]="configService.config().minArticles" (ngModelChange)="updateClusterConfig({minArticles: $event})">
-    </label>
-    <label>
-      Max Articles:
-      <input type="number" [ngModel]="configService.config().maxArticles" (ngModelChange)="updateClusterConfig({maxArticles: $event})">
-    </label>
-  </div>
-
   <!-- Keyboard shortcuts help -->
   @if (showHelp()) {
     <div
