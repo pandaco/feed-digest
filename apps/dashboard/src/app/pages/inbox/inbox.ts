@@ -6,6 +6,7 @@ import { RouterLink } from '@angular/router';
 import { InboxService, Article } from '../../services/inbox.service';
 import { TagPreferenceService } from '../../services/tag-preference.service';
 import { AuthService } from '../../services/auth.service';
+import { ClusterConfigService } from '../../services/cluster-config.service';
 import { formatDate } from '../../shared/format';
 import { getSnoozePresets, SnoozePreset } from '../../shared/snooze.utils';
 import { clusterArticles, getUnclusteredArticles, Cluster } from '../../shared/clustering.utils';
@@ -32,6 +33,7 @@ export class InboxComponent {
   private service = inject(InboxService);
   private prefService = inject(TagPreferenceService);
   private auth = inject(AuthService);
+  private configService = inject(ClusterConfigService);
   private sanitizer = inject(DomSanitizer);
   private destroyRef = inject(DestroyRef);
   private errorTimer?: ReturnType<typeof setTimeout>;
@@ -732,13 +734,18 @@ export class InboxComponent {
   // Clustering
   viewMode = signal<'list' | 'clusters'>('list');
   expandedClusters = signal<Set<string>>(new Set());
+import { ClusterConfigService } from '../../services/cluster-config.service';
+
+// ... (dans la classe InboxComponent)
+  private configService = inject(ClusterConfigService);
+
   clusterSynthesis = signal<Record<string, string>>({});
   synthesizingCluster = signal<string | null>(null);
 
   private clusterVersion = signal(0);
   clusters = computed(() => {
     this.clusterVersion(); // track to allow manual refresh
-    return clusterArticles(this.filteredArticles());
+    return clusterArticles(this.filteredArticles(), this.configService.config());
   });
   unclusteredArticles = computed(() => getUnclusteredArticles(this.filteredArticles(), this.clusters()));
   clusteredArticleCount = computed(() => this.clusters().reduce((sum, c) => sum + c.articles.length, 0));

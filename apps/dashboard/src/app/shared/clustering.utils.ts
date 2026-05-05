@@ -1,4 +1,5 @@
 import { Article } from '../services/inbox.service';
+import { ClusterConfig } from '../services/cluster-config.service';
 
 export interface Cluster {
   id: string;
@@ -6,8 +7,6 @@ export interface Cluster {
   sharedTags: string[];
   label: string;
 }
-
-const MAX_CLUSTER_SIZE = 50;
 
 /**
  * Union-find clustering: articles sharing >= minShared tags are merged.
@@ -76,27 +75,27 @@ function buildCluster(articles: Article[]): Cluster {
 }
 
 /**
- * Groups articles that share >= 2 tags using union-find.
+ * Groups articles that share >= minShared tags using union-find.
  * Large clusters (> MAX_CLUSTER_SIZE) are recursively split
  * by raising the minimum shared tag threshold.
  */
-export function clusterArticles(articles: Article[]): Cluster[] {
+export function clusterArticles(articles: Article[], config: ClusterConfig): Cluster[] {
   if (articles.length === 0) return [];
 
   const clusters: Cluster[] = [];
 
   function splitGroup(group: Article[], minShared: number): void {
-    if (group.length < 5) return;
+    if (group.length < config.minArticles) return;
 
     // If group is small enough or we can't split further, emit it
-    if (group.length <= MAX_CLUSTER_SIZE || minShared > 20) {
+    if (group.length <= config.maxArticles || minShared > 20) {
       clusters.push(buildCluster(group));
       return;
     }
 
     // Try splitting with a higher threshold
     const subGroups = unionFindGroups(group, minShared + 1);
-    const multiGroups = subGroups.filter(g => g.length >= 5);
+    const multiGroups = subGroups.filter(g => g.length >= config.minArticles);
 
     if (multiGroups.length <= 1) {
       // Higher threshold didn't split — accept as-is
@@ -110,11 +109,11 @@ export function clusterArticles(articles: Article[]): Cluster[] {
     }
   }
 
-  // Initial pass with minShared = 2
-  const initialGroups = unionFindGroups(articles, 2);
+  // Initial pass
+  const initialGroups = unionFindGroups(articles, config.minSharedTags);
   for (const group of initialGroups) {
-    if (group.length < 5) continue;
-    splitGroup(group, 2);
+    if (group.length < config.minArticles) continue;
+    splitGroup(group, config.minSharedTags);
   }
 
   return clusters.sort((a, b) => b.articles.length - a.articles.length);
