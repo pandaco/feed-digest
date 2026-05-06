@@ -89,7 +89,7 @@ export function clusterArticles(articles: Article[], config: ClusterConfig): Clu
 
     // If group is small enough or we can't split further, emit it
     if (group.length <= config.maxArticles || minShared > 20) {
-      clusters.push(buildCluster(group));
+      clusters.push(buildCluster(group.slice(0, config.maxArticles)));
       return;
     }
 
