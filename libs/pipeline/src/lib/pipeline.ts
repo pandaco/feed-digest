@@ -206,7 +206,7 @@ async function sendNotifications(
 
   await options.notifier.sendRunSummary({
     runLabel,
-    date: runAtDate.toLocaleString(),
+    date: runAtDate.toLocaleDateString('fr-FR') + ', ' + runAtDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
     articlesProcessed: articles.length,
     articlesRemaining: remaining,
     tagCounts,
