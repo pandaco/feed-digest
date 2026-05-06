@@ -167,22 +167,16 @@ export class InoreaderScraper implements ScraperPort {
 
   private async getUnreadCount(page: Page): Promise<number> {
     return page.evaluate(() => {
-      const titleMatch = document.title.match(/\((\d+)\)/);
-      if (titleMatch) return parseInt(titleMatch[1], 10);
-
-      const allLinks = Array.from(document.querySelectorAll('a, span, div'));
-      for (const el of allLinks) {
-        const text = el.textContent?.trim() || '';
-        if (el.closest('[class*="tree"]') || el.closest('[class*="sidebar"]') || el.closest('[class*="nav"]')) {
-          const countMatch = text.match(/^(\d+)$/);
-          if (countMatch && parseInt(countMatch[1], 10) > 0) {
-            return parseInt(countMatch[1], 10);
-          }
-        }
+      // Sélecteur spécifique pour le compteur d'Inoreader dans la sidebar
+      const counter = document.querySelector('.unread_count, [class*="unread_count"]');
+      if (counter?.textContent) {
+        const count = parseInt(counter.textContent.replace(/\D/g, ''), 10);
+        if (!isNaN(count)) return count;
       }
 
+      // Fallback vers le compte d'éléments chargés dans le DOM
       const articleContainers = document.querySelectorAll('[data-aid]');
-      return articleContainers.length > 0 ? articleContainers.length : 0;
+      return articleContainers.length;
     });
   }
 
