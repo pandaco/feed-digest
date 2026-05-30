@@ -29,45 +29,50 @@ export interface RunPipelineOptions {
 
 const LANGUAGE_MAP: Record<string, string> = { fr: 'French', en: 'English' };
 
+// Thresholds for relevance-score-based importance
+const RELEVANCE_HIGH = 7;
+const RELEVANCE_LOW  = 3;
+
 function computeImportance(
   tags: string[],
   tagOverrides: Record<string, string>,
   tagPrefs: Record<string, { selectionCount: number; presentedCount: number }>,
   threshold: number,
   minRuns: number,
+  relevanceScore?: number,
 ): Article['importance'] {
-  if (tags.length === 0) return 'medium';
-
   let hasAuto = false;
   let hasAccepted = false;
-  let allFiltered = true;
+  let allFiltered = tags.length > 0;
 
   for (const tag of tags) {
     const key = normalizeTag(tag);
     const override = tagOverrides[key];
 
-    if (override === 'auto') {
-      hasAuto = true;
-      allFiltered = false;
-      continue;
-    }
-
-    if (override === 'filtered') {
-      continue;
-    }
+    if (override === 'auto') { hasAuto = true; allFiltered = false; continue; }
+    if (override === 'filtered') { continue; }
 
     allFiltered = false;
 
-    // Score-based: if the user frequently selects this tag, it's important
     const stats = tagPrefs[key];
     if (stats && stats.presentedCount >= minRuns) {
-      const score = stats.selectionCount / stats.presentedCount;
-      if (score >= threshold) hasAccepted = true;
+      if (stats.selectionCount / stats.presentedCount >= threshold) hasAccepted = true;
     }
   }
 
+  // Manual overrides — absolute priority
   if (hasAuto) return 'high';
   if (allFiltered) return 'low';
+
+  // Relevance score — primary signal when available
+  if (relevanceScore !== undefined) {
+    if (relevanceScore >= RELEVANCE_HIGH) return 'high';
+    if (hasAccepted) return 'high';
+    if (relevanceScore <= RELEVANCE_LOW) return 'low';
+    return 'medium';
+  }
+
+  // Fallback: tag preference only (no USER_INTERESTS configured)
   if (hasAccepted) return 'high';
   return 'medium';
 }
@@ -118,6 +123,7 @@ async function enrichAndSave(
     prefContext.tags,
     prefContext.threshold,
     prefContext.minRuns,
+    enrichment.relevanceScore,
   );
 
   const article: Article = {
