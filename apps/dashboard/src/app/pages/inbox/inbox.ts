@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { InboxService, Article } from '../../services/inbox.service';
+import { InboxService, Article, RetagProgress } from '../../services/inbox.service';
 import { TagPreferenceService } from '../../services/tag-preference.service';
 import { AuthService } from '../../services/auth.service';
 import { ClusterConfigService, ClusterConfig } from '../../services/cluster-config.service';
@@ -138,12 +138,14 @@ export class InboxComponent {
   // Summary
   summaryHtml = signal('');
   summaryLoading = signal(false);
+  retagProgress = signal<{ retagged: number; errors: number; total: number } | null>(null);
 
   // Stats
   totalCount = computed(() => this.articles().length);
   highCount = computed(() => this.articles().filter(a => a.importance === 'high').length);
   mediumCount = computed(() => this.articles().filter(a => a.importance === 'medium').length);
   lowCount = computed(() => this.articles().filter(a => a.importance === 'low').length);
+  untaggedCount = computed(() => this.articles().filter(a => !a.tags || a.tags.length === 0).length);
 
   sourceCountsList = computed(() => countByField(this.articles(), a => a.feedSource));
 
@@ -545,6 +547,35 @@ export class InboxComponent {
       error: () => {
         this.error.set('Failed to generate summary');
         this.summaryLoading.set(false);
+      },
+    });
+  }
+
+  retagUntagged(): void {
+    if (this.retagProgress()) return;
+    this.error.set(null);
+
+    this.service.retagUntaggedStream().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (event: RetagProgress) => {
+        if (event.type === 'start') {
+          this.retagProgress.set({ retagged: 0, errors: 0, total: event.total ?? 0 });
+        } else if (event.type === 'progress') {
+          this.retagProgress.set({
+            retagged: event.retagged ?? 0,
+            errors: event.errors ?? 0,
+            total: event.total ?? 0,
+          });
+        } else if (event.type === 'done') {
+          this.retagProgress.set(null);
+          this.loadInbox();
+        } else if (event.type === 'error') {
+          this.error.set('Erreur lors du taguage des articles');
+          this.retagProgress.set(null);
+        }
+      },
+      error: () => {
+        this.error.set('Erreur lors du taguage des articles');
+        this.retagProgress.set(null);
       },
     });
   }

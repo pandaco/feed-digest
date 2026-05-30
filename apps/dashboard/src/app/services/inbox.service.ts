@@ -21,6 +21,14 @@ export interface Article {
   snoozedUntil?: string;
 }
 
+export interface RetagProgress {
+  type: 'start' | 'progress' | 'done' | 'error';
+  retagged?: number;
+  errors?: number;
+  total?: number;
+  message?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class InboxService {
   private http = inject(HttpClient);
@@ -74,6 +82,63 @@ export class InboxService {
       `${this.apiBase}/${articleId}/unsnooze`,
       {},
     );
+  }
+
+  retagUntaggedStream(): Observable<RetagProgress> {
+    return new Observable<RetagProgress>(observer => {
+      const controller = new AbortController();
+      const token = sessionStorage.getItem('apiToken') ?? '';
+
+      fetch(`${this.apiBase}/retag-untagged`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'x-telegram-bot-api-secret-token': token } : {}),
+        },
+        signal: controller.signal,
+      }).then(async response => {
+        if (!response.ok || !response.body) {
+          observer.error(new Error(`HTTP ${response.status}`));
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const chunks = buffer.split('\n\n');
+            buffer = chunks.pop() ?? '';
+
+            for (const chunk of chunks) {
+              const line = chunk.trim();
+              if (line.startsWith('data: ')) {
+                try {
+                  const data: RetagProgress = JSON.parse(line.slice(6));
+                  observer.next(data);
+                  if (data.type === 'done' || data.type === 'error') {
+                    observer.complete();
+                    return;
+                  }
+                } catch { /* skip malformed */ }
+              }
+            }
+          }
+        } catch (err) {
+          if ((err as Error).name !== 'AbortError') observer.error(err);
+        }
+        observer.complete();
+      }).catch(err => {
+        if (err?.name !== 'AbortError') observer.error(err);
+      });
+
+      return () => controller.abort();
+    });
   }
 
   getSnoozed(): Observable<Article[]> {

@@ -75,6 +75,31 @@
         <span class="stat-value stat-tags">{{ tagCounts().length }}</span>
         <span class="stat-label">Tags</span>
       </div>
+      @if (untaggedCount() > 0 || retagProgress()) {
+        <div class="stat-card stat-card-action" [title]="untaggedCount() + ' article(s) sans tags'">
+          <span class="stat-value stat-untagged">{{ untaggedCount() }}</span>
+          <span class="stat-label">Sans tags</span>
+          @if (retagProgress(); as prog) {
+            <div class="retag-progress-wrap">
+              <div class="retag-progress-track">
+                <div
+                  class="retag-progress-fill"
+                  [style.width.%]="prog.total > 0 ? (prog.retagged / prog.total) * 100 : 0"
+                ></div>
+              </div>
+              <span class="retag-progress-label">{{ prog.retagged }}/{{ prog.total }}</span>
+            </div>
+          } @else {
+            <button
+              class="btn btn-sm btn-retag"
+              (click)="retagUntagged()"
+              title="Relancer l'analyse LLM pour taguer ces articles"
+            >
+              Taguer
+            </button>
+          }
+        </div>
+      }
     </section>
 
     <!-- AI Summary -->
@@ -260,6 +285,16 @@
             Refresh clusters
           </button>
         </div>
+        @if (untaggedCount() > 0) {
+          <div class="cluster-untagged-warning">
+            <span>⚠ {{ untaggedCount() }} article{{ untaggedCount() !== 1 ? 's' : '' }} sans tags — le clustering peut être incomplet.</span>
+            @if (!retagProgress()) {
+              <button class="btn-retag-inline" (click)="retagUntagged()">Taguer maintenant</button>
+            } @else {
+              <span class="retag-inline-progress">{{ retagProgress()!.retagged }}/{{ retagProgress()!.total }}</span>
+            }
+          </div>
+        }
         @if (clusters().length === 0) {
           <div class="empty-state">No clusters found (articles need to share at least 2 tags).</div>
         }

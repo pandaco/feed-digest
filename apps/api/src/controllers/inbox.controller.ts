@@ -1,17 +1,39 @@
 import {
-  Controller, Get, Post, Delete, Param, Body, Inject, HttpException, HttpStatus,
+  Controller, Get, Post, Delete, Param, Body, Inject, HttpException, HttpStatus, Res,
 } from '@nestjs/common';
-import { StoragePort, LlmPort } from '@feed-digest/core';
+import { Response } from 'express';
+import { StoragePort, LlmPort, TagPreferencePort, Article, normalizeTag } from '@feed-digest/core';
+
+function retagImportance(relevanceScore?: number): Article['importance'] {
+  if (relevanceScore === undefined) return 'medium';
+  if (relevanceScore >= 7) return 'high';
+  if (relevanceScore <= 3) return 'low';
+  return 'medium';
+}
+
+function tagsToSelections(articles: Article[], selected: boolean): Record<string, boolean> {
+  const selections: Record<string, boolean> = {};
+  for (const article of articles) {
+    for (const tag of article.tags ?? []) {
+      const key = normalizeTag(tag);
+      if (key) selections[key] = selected;
+    }
+  }
+  return selections;
+}
 
 @Controller('api/inbox')
 export class InboxController {
   private readonly summaryLang: string;
+  private readonly chatId: string;
 
   constructor(
     @Inject('STORAGE') private readonly storage: StoragePort,
     @Inject('LLM') private readonly llm: LlmPort,
+    @Inject('TAG_PREFERENCE') private readonly tagPreference: TagPreferencePort,
   ) {
     this.summaryLang = process.env['SUMMARY_LANG'] || 'fr';
+    this.chatId = process.env['TELEGRAM_CHAT_ID'] || '';
   }
 
   @Get()
@@ -90,6 +112,69 @@ export class InboxController {
     }
   }
 
+  @Post('retag-untagged')
+  async retagUntagged(@Res() res: Response) {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+    try {
+      const articles = await this.storage.getUntaggedArticles();
+      const total = articles.length;
+      send({ type: 'start', total });
+
+      if (total === 0) {
+        send({ type: 'done', retagged: 0, errors: 0, total: 0 });
+        res.end();
+        return;
+      }
+
+      const summaryLang = process.env['SUMMARY_LANG'] || 'fr';
+      const languageName = summaryLang === 'fr' ? 'French' : 'English';
+      const maxTags = parseInt(process.env['MAX_TAGS'] || '3', 10);
+      const userInterests = process.env['USER_INTERESTS'] || '';
+
+      let retagged = 0;
+      let errors = 0;
+
+      for (const article of articles) {
+        try {
+          const content = article.summary || article.title;
+          const enrichment = await this.llm.enrich({
+            title: article.title,
+            content,
+            contentUnavailable: true,
+            language: languageName,
+            maxTags,
+            userInterests: userInterests || undefined,
+          });
+          const importance = retagImportance(enrichment.relevanceScore);
+          await this.storage.updateArticle({
+            ...article,
+            tags: enrichment.tags,
+            relevanceScore: enrichment.relevanceScore,
+            importance,
+          });
+          retagged++;
+        } catch (err) {
+          console.error(`[API] Failed to retag article ${article.id}:`, err);
+          errors++;
+        }
+        send({ type: 'progress', retagged, errors, total });
+      }
+
+      send({ type: 'done', retagged, errors, total });
+    } catch (err) {
+      console.error('[API] Failed to retag untagged articles:', err);
+      send({ type: 'error', message: 'Internal error' });
+    }
+
+    res.end();
+  }
+
   @Post('bulk-delete')
   async bulkDelete(@Body() body: { articleIds: string[] }) {
     const { articleIds } = body;
@@ -97,7 +182,15 @@ export class InboxController {
       throw new HttpException('articleIds must be a non-empty array', HttpStatus.BAD_REQUEST);
     }
     try {
+      const allArticles = await this.storage.getFromInbox();
+      const toDelete = allArticles.filter(a => articleIds.includes(a.id));
       await this.storage.deleteFromInbox(articleIds);
+      if (this.chatId && toDelete.length > 0) {
+        const selections = tagsToSelections(toDelete, false);
+        if (Object.keys(selections).length > 0) {
+          await this.tagPreference.record(this.chatId, selections).catch(() => {});
+        }
+      }
       return { deleted: articleIds.length };
     } catch (error) {
       console.error('[API] Failed to bulk delete:', error);
@@ -119,6 +212,12 @@ export class InboxController {
       }
       await this.storage.appendToSaved(toSave.map(a => ({ ...a, isSaved: true })));
       await this.storage.deleteFromInbox(toSave.map(a => a.id));
+      if (this.chatId) {
+        const selections = tagsToSelections(toSave, true);
+        if (Object.keys(selections).length > 0) {
+          await this.tagPreference.record(this.chatId, selections).catch(() => {});
+        }
+      }
       return { saved: toSave.length };
     } catch (error) {
       if (error instanceof HttpException) throw error;
@@ -171,7 +270,15 @@ export class InboxController {
   @Delete(':articleId')
   async deleteInbox(@Param('articleId') articleId: string) {
     try {
+      const allArticles = await this.storage.getFromInbox();
+      const article = allArticles.find(a => a.id === articleId);
       await this.storage.deleteFromInbox([articleId]);
+      if (this.chatId && article) {
+        const selections = tagsToSelections([article], false);
+        if (Object.keys(selections).length > 0) {
+          await this.tagPreference.record(this.chatId, selections).catch(() => {});
+        }
+      }
       return { message: 'Article deleted' };
     } catch (error) {
       console.error('[API] Failed to delete article:', error);

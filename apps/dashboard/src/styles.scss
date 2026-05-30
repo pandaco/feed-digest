@@ -298,6 +298,12 @@ h2 {
   border: 1px solid var(--danger-border);
 }
 
+.alert-info {
+  background: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
 // Stats
 .stats-section {
   display: grid;

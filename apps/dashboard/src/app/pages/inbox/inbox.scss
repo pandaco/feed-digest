@@ -210,6 +210,91 @@ kbd {
 .stat-medium { color: var(--importance-medium); }
 .stat-low { color: var(--importance-low); }
 .stat-tags { color: var(--primary); }
+.stat-untagged { color: var(--warning); }
+
+// Stat card with action button
+.stat-card-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  border-color: var(--warning-border);
+  background: var(--warning-light);
+}
+
+.btn-retag {
+  margin-top: 0.1rem;
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--warning-border);
+  background: transparent;
+  color: var(--warning-text);
+  border-radius: 4px;
+  cursor: pointer;
+  &:hover { background: var(--warning-border); }
+}
+
+.retag-progress-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+}
+
+.retag-progress-track {
+  width: 100%;
+  height: 5px;
+  background: var(--warning-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.retag-progress-fill {
+  height: 100%;
+  background: var(--warning);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.retag-progress-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--warning-text);
+}
+
+.cluster-untagged-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--warning-light);
+  border: 1px solid var(--warning-border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--warning-text);
+}
+
+.btn-retag-inline {
+  flex-shrink: 0;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--warning-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--warning-text);
+  font-size: 0.75rem;
+  cursor: pointer;
+  &:hover { background: var(--warning-border); }
+}
+
+.retag-inline-progress {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--warning-text);
+}
 
 // Summary actions
 .summary-actions {
