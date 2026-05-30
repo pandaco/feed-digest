@@ -7,6 +7,13 @@
     </button>
   </div>
 
+  @if (!auth.chatId()) {
+    <div class="alert alert-info">
+      Un <strong>Chat ID</strong> Telegram est requis pour charger les préférences.
+      Configure-le dans <strong>Settings</strong> (icône en haut à droite).
+    </div>
+  }
+
   @if (error()) {
     <div class="alert alert-error">{{ error() }}</div>
   }
@@ -36,6 +43,18 @@
       <div class="stat-card">
         <span class="stat-value">{{ formatScore(threshold()) }}</span>
         <span class="stat-label">Threshold</span>
+      </div>
+    </section>
+
+    <section class="legend-section">
+      <div class="legend-item legend-auto">
+        <strong>Auto</strong> — always included in digests because the score exceeds the threshold, or manually forced.
+      </div>
+      <div class="legend-item legend-default">
+        <strong>Default</strong> — standard behaviour: included or excluded based on the calculated score.
+      </div>
+      <div class="legend-item legend-filtered">
+        <strong>Filtered</strong> — always excluded from digests regardless of score.
       </div>
     </section>
 

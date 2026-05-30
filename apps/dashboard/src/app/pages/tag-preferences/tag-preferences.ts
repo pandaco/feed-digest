@@ -26,7 +26,7 @@ interface TagRow {
 })
 export class TagPreferencesComponent {
   private service = inject(TagPreferenceService);
-  private auth = inject(AuthService);
+  protected auth = inject(AuthService);
   private destroyRef = inject(DestroyRef);
   private errorTimer?: ReturnType<typeof setTimeout>;
 
