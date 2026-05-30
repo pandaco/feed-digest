@@ -37,8 +37,9 @@ npm run setup
 # Run the pipeline (bypass time window)
 npm run scraper
 
-# Run the local API server (dashboard backend)
-npm run api
+# Run the dashboard (API + Angular dev server simultaneously)
+npm run dev
+# or separately:  npm run api  /  npm run dashboard
 
 # Fix publication dates (re-fetch real dates from source URLs)
 npm run fix-dates
@@ -80,10 +81,14 @@ npm run fix-dates
 
 1. **Scraping**: collects articles from InoReader — unread (`inoreader`) or starred (`inoreader-saved`) depending on `SCRAPER_SOURCE` (FIFO, max 150)
 2. **Content fetching**: fetches each article's source page, extracts full text via Readability and the real publication date from HTML meta tags / JSON-LD
-3. **Enrichment**: summary, tags, and relevance score via LLM. The LLM also computes a `relevanceScore` (1-10) based on the user's interest profile (`USER_INTERESTS`). Importance is **not** determined by the LLM — it is computed from your tag preferences:
-   - Tag with `auto` override or high selection score → **high**
-   - All tags `filtered` → **low**
+3. **Enrichment**: summary, tags, and relevance score via LLM. The LLM computes a `relevanceScore` (1–10) based on `USER_INTERESTS`. Importance is computed from that score and your tag preferences, in priority order:
+   - Tag with `auto` override → **high** (absolute priority)
+   - All tags `filtered` → **low** (absolute priority)
+   - `relevanceScore ≥ 7` → **high**
+   - Tag with high selection score (`> TAG_PREFERENCE_THRESHOLD` after `TAG_PREFERENCE_MIN_RUNS` runs) → **high**
+   - `relevanceScore ≤ 3` → **low**
    - Otherwise → **medium**
+   - If `USER_INTERESTS` is not set, only tag preferences apply (everything defaults to **medium**).
 4. **Storage**: all articles go to Inbox + All. Storage backend is configurable via `STORAGE_BACKEND` (`google-sheets`, `notion`, or `dynamodb`). For `inoreader-saved`, processed articles are unstarred on InoReader. Articles also store `relevanceScore` and optional `snoozedUntil` fields.
 5. **Telegram notification**: a single rich summary message with pipeline funnel (collected → deduped → noise-filtered → processed), importance breakdown (high/medium/low), average relevance score, top 5 sources, LLM usage (calls + tokens in/out), and run duration.
 6. **Preference learning**: tag preferences are learned from dashboard interactions. Tags can be manually overridden to `auto` (boosts importance to High) or `filtered` (hides article/lowers importance) via the dashboard.
@@ -92,12 +97,12 @@ npm run fix-dates
 
 The Angular dashboard (`apps/dashboard`) provides seven views:
 
-- **Inbox**: browse, filter, and bulk-manage articles. Includes temporal histogram (day/week/month/year), top tags and sources charts (clickable to activate filters), AI summary generation with period and filtered-selection options, advanced filters (scraper source, tags), keyboard shortcuts (`?` to list them), tag-based clustering with per-article dates, checkboxes, bulk save/delete per cluster, recursive splitting for large clusters, cluster stats toolbar with refresh, snooze presets, and relevance score display. Search covers title, summary, and tags with relevance scoring.
+- **Inbox**: browse, filter, and bulk-manage articles. Includes stats (total, high/medium/low counts, tag count, untagged counter with one-click re-analysis), temporal histogram (day/week/month/year), top tags and sources charts (clickable filters), AI summary with period and filtered-selection options, advanced filters (scraper source, tags), keyboard shortcuts (`?` to list them), tag-based clustering with bulk actions and cluster synthesis via LLM, snooze presets, and relevance score display. The cluster view shows a warning when untagged articles may degrade grouping quality.
 - **Triage**: single-article-at-a-time quick processing — Save, Pass, or Skip with keyboard shortcuts.
-- **Saved**: browse and manage saved articles with the same filtering capabilities.
-- **Snoozed**: view and manage snoozed articles, unsnooze on demand.
-- **Tag Preferences**: view tag selection scores and override auto-selection behavior (`auto`, `filtered`, or default).
-- **Interests**: edit your interest profile (free text), used by the LLM for relevance scoring.
-- **Reader** (Focus Mode): clean reading view with 70ch max-width typography, summary/full content toggle, reading time estimate, table of contents panel, and score display. Accessible via "Read" buttons on inbox and saved articles.
+- **Saved**: browse and manage saved articles with the same filtering and sorting as Inbox.
+- **Snoozed**: view all snoozed articles with their snooze expiry date; unsnooze on demand.
+- **Tag Preferences**: view tag selection scores, override auto-selection behavior (`auto`, `filtered`, or default), and reset preferences.
+- **Interests**: edit your interest profile as free text (e.g. `"AI, distributed systems, climate tech"`). Stored as `.user-interests.txt`, injected into the LLM enrich prompt to drive `relevanceScore` and therefore **importance**.
+- **Reader** (Focus Mode): clean reading view with 70ch typography, summary/full content toggle, reading time estimate, table of contents panel, and score display. Accessible via "Read" buttons throughout the app.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for the full development guide.
