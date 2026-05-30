@@ -46,10 +46,11 @@ export function createLlm(label = 'App'): { llm: LlmPort; provider: 'claude' | '
 }
 
 export function createTagPreference(): TagPreferencePort {
-  return process.env['NODE_ENV'] === 'development'
-    ? new FileTagPreference()
-    : new DynamoDbTagPreference({
+  const table = process.env['DYNAMODB_TAG_PREF_TABLE_NAME'];
+  return table
+    ? new DynamoDbTagPreference({
         region: process.env['AWS_REGION'] || 'eu-central-1',
-        tableName: process.env['DYNAMODB_TAG_PREF_TABLE_NAME']!,
-      });
+        tableName: table,
+      })
+    : new FileTagPreference();
 }
