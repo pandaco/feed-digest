@@ -7,6 +7,8 @@
     "lint": "npx nx run-many -t lint",
     "test": "npx nx run-many -t test",
     "api": "npx nx serve api",
+    "dashboard": "npx nx serve dashboard",
+    "dev": "concurrently --names \"api,dashboard\" --prefix-colors \"blue,green\" \"npm run api\" \"npm run dashboard\"",
     "scraper": "RUN_NOW=true npx tsx --tsconfig tsconfig.base.json apps/scraper/src/main.ts",
     "purge": "npx tsx --tsconfig tsconfig.base.json apps/scraper/src/purge.ts",
     "recover": "npx tsx --tsconfig tsconfig.base.json apps/scraper/src/recover.ts",
