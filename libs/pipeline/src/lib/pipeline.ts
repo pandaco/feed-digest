@@ -259,6 +259,12 @@ async function sendNotifications(
   });
 }
 
+interface MarkTiming {
+  ms: number;
+  ok: boolean;
+  scrolls: number;
+}
+
 function percentile(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
   const idx = Math.min(sorted.length - 1, Math.floor(p * sorted.length));
@@ -267,6 +273,7 @@ function percentile(sorted: number[], p: number): number {
 
 function logPerformanceSummary(
   successful: EnrichResult[],
+  markTimings: MarkTiming[],
   enrichTotalMs: number,
   markTotalMs: number,
   concurrency: number,
@@ -283,9 +290,12 @@ function logPerformanceSummary(
   const totalTimes = successful
     .map(r => r.timings.fetchMs + r.timings.enrichMs + r.timings.storeMs + r.timings.jitterMs)
     .sort((a, b) => a - b);
+  const markMsTimes = markTimings.map(t => t.ms).sort((a, b) => a - b);
+  const markOk = markTimings.filter(t => t.ok).length;
+  const markScrollsTotal = markTimings.reduce((s, t) => s + Math.max(0, t.scrolls), 0);
 
   const sum = (arr: number[]) => arr.reduce((s, v) => s + v, 0);
-  const mean = (arr: number[]) => Math.round(sum(arr) / arr.length);
+  const mean = (arr: number[]) => arr.length === 0 ? 0 : Math.round(sum(arr) / arr.length);
   const fmtMs = (ms: number) => `${ms.toLocaleString()}ms`;
   const fmtSec = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
 
@@ -294,18 +304,30 @@ function logPerformanceSummary(
   const parallelismRatio = (cumulativeWorkMs / enrichTotalMs).toFixed(2);
 
   console.log('');
-  console.log('[Pipeline] ┌─ Performance summary ────────────────────────────────');
+  console.log('[Pipeline] ┌─ Performance summary ─────────────────────────────────');
   console.log(`[Pipeline] │ Articles processed : ${successful.length}`);
   console.log(`[Pipeline] │ Wall clock         : ${fmtSec(totalWallMs)} (enrich ${fmtSec(enrichTotalMs)} + markAsRead ${fmtSec(markTotalMs)})`);
   console.log(`[Pipeline] │ LLM provider       : ${llmProvider}  (concurrency=${concurrency})`);
   console.log(`[Pipeline] │ Throughput         : ${(successful.length / (totalWallMs / 1000)).toFixed(2)} art/s  (≈ ${fmtMs(Math.round(totalWallMs / successful.length))} per article wall time)`);
   console.log(`[Pipeline] │ Parallelism factor : ${parallelismRatio}× (cumulative work ${fmtSec(cumulativeWorkMs)} vs wall ${fmtSec(enrichTotalMs)})`);
+  if (markTimings.length > 0) {
+    const successRate = ((markOk / markTimings.length) * 100).toFixed(0);
+    const avgScrolls = (markScrollsTotal / markTimings.length).toFixed(1);
+    console.log(`[Pipeline] │ markAsRead         : ${markOk}/${markTimings.length} ok (${successRate}%), ${markScrollsTotal} total scrolls (avg ${avgScrolls}/article)`);
+  } else if (!process.env['SKIP_MARK_AS_READ']) {
+    console.log('[Pipeline] │ markAsRead         : (no items marked)');
+  } else {
+    console.log('[Pipeline] │ markAsRead         : skipped (SKIP_MARK_AS_READ=true)');
+  }
   console.log('[Pipeline] │');
   console.log('[Pipeline] │ Per-article timings  avg     p50     p95     max');
   console.log(`[Pipeline] │   fetch content     ${fmtMs(mean(fetchTimes)).padStart(7)} ${fmtMs(percentile(fetchTimes, 0.5)).padStart(7)} ${fmtMs(percentile(fetchTimes, 0.95)).padStart(7)} ${fmtMs(fetchTimes[fetchTimes.length - 1]).padStart(7)}`);
   console.log(`[Pipeline] │   enrich (LLM)      ${fmtMs(mean(enrichTimes)).padStart(7)} ${fmtMs(percentile(enrichTimes, 0.5)).padStart(7)} ${fmtMs(percentile(enrichTimes, 0.95)).padStart(7)} ${fmtMs(enrichTimes[enrichTimes.length - 1]).padStart(7)}`);
   console.log(`[Pipeline] │   storage writes    ${fmtMs(mean(storeTimes)).padStart(7)} ${fmtMs(percentile(storeTimes, 0.5)).padStart(7)} ${fmtMs(percentile(storeTimes, 0.95)).padStart(7)} ${fmtMs(storeTimes[storeTimes.length - 1]).padStart(7)}`);
-  console.log('[Pipeline] └──────────────────────────────────────────────────────');
+  if (markMsTimes.length > 0) {
+    console.log(`[Pipeline] │   mark as read      ${fmtMs(mean(markMsTimes)).padStart(7)} ${fmtMs(percentile(markMsTimes, 0.5)).padStart(7)} ${fmtMs(percentile(markMsTimes, 0.95)).padStart(7)} ${fmtMs(markMsTimes[markMsTimes.length - 1]).padStart(7)}`);
+  }
+  console.log('[Pipeline] └───────────────────────────────────────────────────────');
   console.log('');
 }
 
@@ -368,6 +390,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<void> {
       console.log('[Pipeline] SKIP_MARK_AS_READ=true → articles will stay unread/starred on Inoreader.');
     }
     const markPromises: Promise<void>[] = [];
+    const markTimings: MarkTiming[] = [];
 
     const enrichStart = Date.now();
     const results = await Promise.all(metadata.map((meta, i) => limitEnrich(async () => {
@@ -376,8 +399,11 @@ export async function runPipeline(options: RunPipelineOptions): Promise<void> {
         const result = await enrichAndSave(meta, i, metadata.length, options, languageName, runAt, minDelayMs, maxDelayMs, prefContext);
         if (result && !skipMarkAsRead) {
           markPromises.push(limitMarkRead(async () => {
-            console.log(`[Pipeline] ${tag} Marking as read (async)...`);
-            await options.scraper.markAsRead(result.article.id, result.article.url);
+            const markStart = Date.now();
+            const outcome = await options.scraper.markAsRead(result.article.id, result.article.url);
+            const ms = Date.now() - markStart;
+            markTimings.push({ ms, ok: outcome.ok, scrolls: outcome.scrolls });
+            console.log(`[Pipeline] ${tag} markRead ${outcome.ok ? 'OK' : 'MISS'} in ${ms}ms (${outcome.scrolls} scroll${outcome.scrolls === 1 ? '' : 's'})`);
           }));
         }
         return result;
@@ -402,7 +428,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<void> {
       console.log(`[Pipeline] Mark-as-read drained in ${markTotalMs}ms.`);
     }
 
-    logPerformanceSummary(successful, enrichTotalMs, markTotalMs, concurrency, options.llmProvider);
+    logPerformanceSummary(successful, markTimings, enrichTotalMs, markTotalMs, concurrency, options.llmProvider);
 
     // Automatic purge of expired articles in ALL collection
     const retentionDays = parseInt(process.env['RETENTION_DAYS_ALL'] || '30', 10);

@@ -1,4 +1,4 @@
-import { ScraperPort, CollectResult, ArticleMetadata, FetchContentResult } from '@feed-digest/core';
+import { ScraperPort, CollectResult, ArticleMetadata, FetchContentResult, MarkAsReadResult } from '@feed-digest/core';
 
 /**
  * Wraps multiple scrapers and merges their results.
@@ -39,10 +39,18 @@ export class CompositeScraper implements ScraperPort {
     return this.scrapers[0].fetchContent(url);
   }
 
-  async markAsRead(articleId: string, url: string): Promise<void> {
+  async markAsRead(articleId: string, url: string): Promise<MarkAsReadResult> {
+    // Aggregate: succeed if any underlying scraper found and marked the
+    // article; sum scrolls across attempts so the upstream perf stats
+    // reflect the real cost.
+    let ok = false;
+    let scrolls = 0;
     for (const scraper of this.scrapers) {
-      await scraper.markAsRead(articleId, url);
+      const result = await scraper.markAsRead(articleId, url);
+      if (result.ok) ok = true;
+      if (result.scrolls >= 0) scrolls += result.scrolls;
     }
+    return { ok, scrolls };
   }
 
   async close(): Promise<void> {

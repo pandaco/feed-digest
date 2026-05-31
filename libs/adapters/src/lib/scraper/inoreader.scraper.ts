@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
-import { ScraperPort, CollectResult, ArticleMetadata, FetchContentResult } from '@feed-digest/core';
+import { ScraperPort, CollectResult, ArticleMetadata, FetchContentResult, MarkAsReadResult } from '@feed-digest/core';
 
 type InoreaderMode = 'unread' | 'starred';
 
@@ -305,7 +305,7 @@ export class InoreaderScraper implements ScraperPort {
       ? 'https://www.inoreader.com/starred'
       : 'https://www.inoreader.com/all_articles';
     await this.markReadPage.goto(targetUrl, { waitUntil: 'domcontentloaded' });
-    await this.markReadPage.waitForTimeout(3000);
+    await this.markReadPage.waitForTimeout(1500);
 
     return this.markReadPage;
   }
@@ -321,32 +321,36 @@ export class InoreaderScraper implements ScraperPort {
     return null;
   }
 
-  async markAsRead(articleId: string, url: string): Promise<void> {
+  async markAsRead(articleId: string, url: string): Promise<MarkAsReadResult> {
     const action = this.mode === 'starred' ? 'unstar' : 'mark-as-read';
     const key = this.mode === 'starred' ? 's' : 'm';
 
-    console.log(`[InoreaderScraper] Attempting to ${action} article ${articleId}...`);
     const page = await this.initMarkReadPage();
 
     try {
       let container = await this.findArticleContainer(page, articleId, url);
-      for (let i = 0; i < 30 && !container; i++) {
+      let scrolls = 0;
+      // 15 scrolls × 1500px ≈ ~80–100 articles ahead. Inoreader's lazy-load
+      // triggers within ~300ms of a scroll burst, so 350ms is enough.
+      for (; scrolls < 15 && !container; scrolls++) {
         await page.evaluate(() => window.scrollBy(0, 1500));
-        await page.waitForTimeout(800);
+        await page.waitForTimeout(350);
         container = await this.findArticleContainer(page, articleId, url);
       }
 
-      if (container) {
-        await container.scrollIntoViewIfNeeded();
-        await container.click({ position: { x: 10, y: 15 } });
-        await page.waitForTimeout(300);
-        await page.keyboard.press(key);
-        console.log(`[InoreaderScraper] Successfully ${action}: ${url}`);
-      } else {
-        console.warn(`[InoreaderScraper] Could not find article after scrolling: ${url}`);
+      if (!container) {
+        console.warn(`[InoreaderScraper] ${action} not found after ${scrolls} scroll(s): ${url}`);
+        return { ok: false, scrolls };
       }
+
+      await container.scrollIntoViewIfNeeded();
+      await container.click({ position: { x: 10, y: 15 } });
+      await page.waitForTimeout(120);
+      await page.keyboard.press(key);
+      return { ok: true, scrolls };
     } catch (error) {
-      console.error(`[InoreaderScraper] Failed to ${action} ${url}:`, error);
+      console.error(`[InoreaderScraper] ${action} crashed for ${url}:`, error);
+      return { ok: false, scrolls: -1 };
     }
   }
 

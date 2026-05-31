@@ -38,6 +38,18 @@ export interface FetchContentResult {
 }
 
 /**
+ * Outcome of a markAsRead call. `ok` is true when the article was located
+ * and the read/unstar shortcut was sent; false when the article could not
+ * be found in the UI even after scrolling (no exception thrown). `scrolls`
+ * reports how many scroll bursts were required to locate it — useful to
+ * detect when the lazy-load is the bottleneck.
+ */
+export interface MarkAsReadResult {
+  ok: boolean;
+  scrolls: number;
+}
+
+/**
  * Port for the InoReader scraper.
  * This interface isolates the domain from the underlying scraping implementation (Playwright).
  */
@@ -60,11 +72,13 @@ export interface ScraperPort {
 
   /**
    * Marks a specific article as read on InoReader.
-   * 
+   *
    * @param articleId The unique identifier of the article.
    * @param url The URL of the article (used to find it in the UI).
+   * @returns The outcome and how many scrolls were needed. Never throws
+   *          for a "not found" case; only for unexpected crashes.
    */
-  markAsRead(articleId: string, url: string): Promise<void>;
+  markAsRead(articleId: string, url: string): Promise<MarkAsReadResult>;
 
   /**
    * Closes the scraper session and releases browser resources.
