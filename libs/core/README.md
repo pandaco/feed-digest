@@ -1,25 +1,33 @@
 # core
 
-Pure domain layer — no external dependencies.
+Pure domain layer. Zero external dependencies.
 
-## Contents
+## Entities
 
-**Models**
-- `Article` — main entity: id, title, url, tags, summary, importance, relevanceScore, publishedAt, snoozedUntil, …
-- `ArticleMetadata` — lightweight scraper output before enrichment
-- `EnrichInput` / `EnrichOutput` — LLM enrichment contract
-- `TagStats` / `TagPreference` — tag selection tracking
+- `Article` — main entity (id, title, url, tags, summary, importance,
+  relevanceScore, publishedAt, snoozedUntil, …)
+- `ArticleMetadata` — raw scraper output before enrichment
+- `EnrichInput` / `EnrichOutput` — LLM contract
+- `LlmUsage` — cumulative `{ calls, inputTokens, outputTokens }`
+- `TagPreference` / `TagStats` — tag selection tracking
 
-**Ports (interfaces)**
-- `ScraperPort` — collect articles and fetch full content
-- `LlmPort` — `enrich()`, `summarizeInbox()`, `summarizeRun()`
-- `StoragePort` — inbox, saved, all collections; `getUntaggedArticles()`
-- `TagPreferencePort` — record interactions, get overrides and scores
-- `NotifierPort` — send Telegram summary
+## Ports
 
-**Utilities**
-- `normalizeTag` — lowercased, trimmed tag key
-- `deduplicate` — dedup articles by SHA-256 URL hash
-- `filterNoise` — remove noise articles (too short, no content)
+- `ScraperPort` — `collect()`, `fetchContent()`, `markAsRead()`
+- `LlmPort` — `enrich()`, `summarizeInbox()`, `summarizeRun()`, `getUsage()`
+- `StoragePort` — inbox / saved / all collections, `getUntaggedArticles()`
+- `TagPreferencePort` — record interactions, get scores and overrides
+- `NotifierPort` — send the run summary
 
-See [DEVELOPMENT.md](../../DEVELOPMENT.md) for the full architecture and importance computation logic.
+## Utilities
+
+- `normalizeTag` / `normalizeTags` — lowercased, trimmed tag keys
+- `deduplicate` — by SHA-256 URL hash + title similarity
+- `filterNoise` — drop articles with empty/near-empty content
+- `toc` — extract `h2` / `h3` outline from HTML
+
+## Shared types
+
+- `LlmProvider = 'claude' | 'gemini' | 'ollama'` — single source of
+  truth, re-used in `Article.llmProvider`, `RunSummary.llmProvider`,
+  `createLlm()`, and the pipeline options.

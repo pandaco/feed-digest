@@ -1,109 +1,39 @@
 # feed-digest
 
-Automated tech watch pipeline. Collects unread articles from InoReader, enriches them via an LLM (Claude or Gemini) with summaries, tags, and importance levels, then stores them in Google Sheets, Notion, or DynamoDB. A Telegram notification is sent after each run with a rich stats summary.
+Automated tech-watch pipeline. Scrapes Inoreader, enriches each article
+via an LLM (Claude / Gemini / local Ollama), stores everything in your
+backend of choice (Notion / Google Sheets / DynamoDB) and pushes a rich
+run summary to Telegram. Comes with an Angular dashboard for triage,
+clustering, saved articles, snoozing, and tag-preference learning.
 
-## Architecture
-
-Hexagonal architecture (Ports & Adapters) in an NX monorepo:
-
-```
-libs/core/          Interfaces (ports) and domain models
-libs/adapters/      Concrete implementations
-  scraper/          InoreaderAdapter (Playwright)
-  storage/          GoogleSheetsAdapter, NotionAdapter, DynamoDbStorageAdapter
-  llm/              ClaudeAdapter, GeminiAdapter
-  notifier/         TelegramAdapter
-  tag-preference/   DynamoDbTagPreferenceAdapter, FileTagPreferenceAdapter
-libs/pipeline/      Pipeline orchestration
-apps/scraper/       CLI entry point (composition root)
-apps/api/           NestJS API server — local dashboard backend + AWS Lambda handler
-apps/dashboard/     Angular web UI: inbox, triage, saved articles, tag preferences
-```
-
-## Local setup
+## Quick start
 
 ```bash
-# Install
+git clone <repo-url> && cd feed-digest
 npm install
 npx playwright install chromium
+cp .env.example .env       # fill in the sections you actually use
 
-# Configure environment variables
-cp .env.example .env
-# Fill in the .env file
-
-# Set up storage backend schema (Notion or Google Sheets based on STORAGE_BACKEND)
-npm run setup
-
-# Run the pipeline (bypass time window)
-npm run scraper
-
-# Run the dashboard (API + Angular dev server simultaneously)
-npm run dev
-# or separately:  npm run api  /  npm run dashboard
-
-# Fix publication dates (re-fetch real dates from source URLs)
-npm run fix-dates
+npm run setup              # provisions schema for your STORAGE_BACKEND
+npm run scraper            # one pipeline run (scrape → enrich → store → notify)
+npm run dev                # API on :3333, dashboard on :4200
 ```
 
-## Main environment variables
+The smallest viable local stack is **Ollama + Notion** (no API quotas,
+no AWS, ~5 GB model). Two other recipes (Gemini + Sheets, DynamoDB
+Local) are spelled out in [DEVELOPMENT.md](DEVELOPMENT.md#2-local-dev-recipes).
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `INOREADER_EMAIL` / `INOREADER_PASSWORD` | InoReader credentials | - |
-| `LLM_PROVIDER` | `claude`, `gemini`, or `ollama` (local) | `claude` |
-| `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` | LLM API key (not required for `ollama`) | - |
-| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | Ollama endpoint and model (if `ollama`) | `http://localhost:11434` / `llama3.1:8b` |
-| `STORAGE_BACKEND` | Storage backend: `google-sheets`, `notion`, or `dynamodb` | `google-sheets` |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Google service account JSON (if `google-sheets`) | - |
-| `GOOGLE_SHEET_ID` | Target Google Sheet ID (if `google-sheets`) | - |
-| `NOTION_API_KEY` | Notion integration API key (if `notion`) | - |
-| `NOTION_INBOX_DB_ID` | Notion Inbox database ID (if `notion`) | - |
-| `NOTION_ALL_DB_ID` | Notion All database ID (if `notion`) | - |
-| `NOTION_SAVED_DB_ID` | Notion Saved database ID (if `notion`) | - |
-| `DYNAMODB_ARTICLES_TABLE_NAME` | DynamoDB table for articles (if `dynamodb`) | - |
-| `DYNAMODB_TAG_PREF_TABLE_NAME` | DynamoDB table for tag preferences (prod) | - |
-| `DYNAMODB_ENDPOINT` | DynamoDB endpoint override (e.g. `http://localhost:8000` for local) | - |
-| `AWS_REGION` | AWS region for DynamoDB | `eu-central-1` |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram bot configuration | - |
-| `SUMMARY_LANG` | Summary and message language (`fr`, `en`) | `fr` |
-| `SCRAPER_SOURCE` | Scraping sources, comma-separated (`inoreader`, `inoreader-saved`) | `inoreader` |
-| `ARTICLES_LIMIT` | Max articles per run | `150` |
-| `MAX_TAGS` | Max tags per article | `3` |
-| `NODE_ENV` | Set to `development` to use file-based tag preferences instead of DynamoDB | - |
-| `SHOW_BROWSER` | Show Playwright browser | `false` |
-| `RUN_NOW` | Bypass Paris time window | `false` |
-| `TAG_PREFERENCE_THRESHOLD` | Score above which a tag is auto-selected | `0.6` |
-| `TAG_PREFERENCE_MIN_RUNS` | Minimum presentations before auto-selection | `3` |
-| `USER_INTERESTS` | Free-text interest profile for LLM relevance scoring | - |
-| `API_PORT` | Port for the local dashboard API server | `3333` |
-| `DATE_FORMAT` | Date display format in the dashboard (tokens: `yyyy`, `MM`, `dd`, `HH`, `mm`) | `yyyy-MM-dd HH:mm` |
+## Docs
 
-## Pipeline flow
-
-1. **Scraping**: collects articles from InoReader — unread (`inoreader`) or starred (`inoreader-saved`) depending on `SCRAPER_SOURCE` (FIFO, max 150)
-2. **Content fetching**: fetches each article's source page, extracts full text via Readability and the real publication date from HTML meta tags / JSON-LD
-3. **Enrichment**: summary, tags, and relevance score via LLM. The LLM computes a `relevanceScore` (1–10) based on `USER_INTERESTS`. Importance is computed from that score and your tag preferences, in priority order:
-   - Tag with `auto` override → **high** (absolute priority)
-   - All tags `filtered` → **low** (absolute priority)
-   - `relevanceScore ≥ 7` → **high**
-   - Tag with high selection score (`> TAG_PREFERENCE_THRESHOLD` after `TAG_PREFERENCE_MIN_RUNS` runs) → **high**
-   - `relevanceScore ≤ 3` → **low**
-   - Otherwise → **medium**
-   - If `USER_INTERESTS` is not set, only tag preferences apply (everything defaults to **medium**).
-4. **Storage**: all articles go to Inbox + All. Storage backend is configurable via `STORAGE_BACKEND` (`google-sheets`, `notion`, or `dynamodb`). For `inoreader-saved`, processed articles are unstarred on InoReader. Articles also store `relevanceScore` and optional `snoozedUntil` fields.
-5. **Telegram notification**: a single rich summary message with pipeline funnel (collected → deduped → noise-filtered → processed), importance breakdown (high/medium/low), average relevance score, top 5 sources, LLM usage (calls + tokens in/out), and run duration.
-6. **Preference learning**: tag preferences are learned from dashboard interactions. Tags can be manually overridden to `auto` (boosts importance to High) or `filtered` (hides article/lowers importance) via the dashboard.
-
-## Dashboard
-
-The Angular dashboard (`apps/dashboard`) provides seven views:
-
-- **Inbox**: browse, filter, and bulk-manage articles. Includes stats (total, high/medium/low counts, tag count, untagged counter with one-click re-analysis), temporal histogram (day/week/month/year), top tags and sources charts (clickable filters), AI summary with period and filtered-selection options, advanced filters (scraper source, tags), keyboard shortcuts (`?` to list them), tag-based clustering with bulk actions and cluster synthesis via LLM, snooze presets, and relevance score display. The cluster view shows a warning when untagged articles may degrade grouping quality.
-- **Triage**: single-article-at-a-time quick processing — Save, Pass, or Skip with keyboard shortcuts.
-- **Saved**: browse and manage saved articles with the same filtering and sorting as Inbox.
-- **Snoozed**: view all snoozed articles with their snooze expiry date; unsnooze on demand.
-- **Tag Preferences**: view tag selection scores, override auto-selection behavior (`auto`, `filtered`, or default), and reset preferences.
-- **Interests**: edit your interest profile as free text (e.g. `"AI, distributed systems, climate tech"`). Stored as `.user-interests.txt`, injected into the LLM enrich prompt to drive `relevanceScore` and therefore **importance**.
-- **Reader** (Focus Mode): clean reading view with 70ch typography, summary/full content toggle, reading time estimate, table of contents panel, and score display. Accessible via "Read" buttons throughout the app.
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for the full development guide.
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** — local dev recipes, commands,
+  architecture, pipeline flow, importance computation, dashboard
+  features, API endpoints, production deploy.
+- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** — how to obtain the
+  credentials for every external service (Notion, Google Sheets, AWS,
+  Anthropic, Gemini, Ollama, Telegram, Inoreader).
+- **[`.env.example`](.env.example)** — exhaustive env var reference;
+  every key listed there is actually read by the code.
+- **[CHANGELOG.md](CHANGELOG.md)** — release history.
+- Per-package: [`libs/core`](libs/core/README.md),
+  [`libs/adapters`](libs/adapters/README.md),
+  [`libs/pipeline`](libs/pipeline/README.md).

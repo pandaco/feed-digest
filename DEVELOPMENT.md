@@ -1,333 +1,271 @@
-# Development Guide — feed-digest
+# Development guide
 
-This guide explains how to set up, run, and test the **feed-digest** project locally.
+Everything you need to run, debug, and extend **feed-digest** locally.
+For obtaining third-party credentials (Notion API key, Google service
+account, Ollama install, Telegram bot…), see [SETUP_GUIDE.md](SETUP_GUIDE.md).
+For the env var reference, see [`.env.example`](.env.example).
 
 ---
 
-## 1. Local Environment Setup
+## 1. Prerequisites
 
-### 1.1 Prerequisites
-- **Node.js**: v22 or higher.
-- **NX CLI**: Installed globally (`npm install -g nx`) or use `npx nx`.
-- **Playwright**: Installed and browsers initialized (for InoreaderScraper).
-- **Storage backend** (pick one):
-  - **Google Sheets**: a Google service account with access to the target Sheet.
-  - **Notion**: a Notion integration with access to the 3 databases (Inbox, All, Saved).
-- **Telegram Bot**: A token from @BotFather.
+- **Node.js 22+** (CI runs Node 24).
+- **npm** (no global installs needed; `npx nx` is used throughout).
+- **Playwright Chromium**, installed once after `npm install`.
+- Pick one storage backend and one LLM provider, then follow the matching
+  recipe below.
 
-### 1.2 Installation
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd feed-digest
-
-# Install dependencies
+git clone <repo-url> && cd feed-digest
 npm install
-
-# Install Playwright browsers
 npx playwright install chromium
-```
-
-### 1.3 Environment Variables
-Create a `.env` file at the root of the project by copying the example:
-```bash
 cp .env.example .env
 ```
-Fill in the following variables in `.env`:
-- `INOREADER_EMAIL` / `INOREADER_PASSWORD`
-- `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` (skip for `ollama`)
-- `LLM_PROVIDER` (`claude`, `gemini`, or `ollama` for a local model)
-- `SUMMARY_LANG` (fr or en)
-- If `STORAGE_BACKEND=google-sheets`:
-  - `GOOGLE_SERVICE_ACCOUNT_JSON` (the full JSON string)
-  - `GOOGLE_SHEET_ID`
-  - Run `npm run setup` to create the tabs and headers automatically
-- If `STORAGE_BACKEND=notion`:
-  - `NOTION_API_KEY`
-  - `NOTION_INBOX_DB_ID`, `NOTION_ALL_DB_ID`, `NOTION_SAVED_DB_ID`
-  - Run `npm run setup` to provision the Notion database schema
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
-- `SCRAPER_SOURCE` (comma-separated: `inoreader` for unread, `inoreader-saved` for starred, e.g. `inoreader,inoreader-saved`)
-- `STORAGE_BACKEND` (`google-sheets` or `notion`, default: `google-sheets`)
-- `SHOW_BROWSER` (set to `true` to show Playwright browser window)
-- `RUN_NOW` (set to `true` to bypass the Paris time window guard)
-- `DYNAMODB_ARTICLES_TABLE_NAME` (optional for local, see below)
-- `DYNAMODB_TAG_PREF_TABLE_NAME` (optional for local, see below)
-- `TAG_PREFERENCE_THRESHOLD` (default: `0.6` — minimum score for auto-selection)
-- `TAG_PREFERENCE_MIN_RUNS` (default: `3` — minimum presentations before auto-selection kicks in)
-- `USER_INTERESTS` (free-text interest profile for LLM relevance scoring, also editable via dashboard)
-- `API_PORT` (default: `3333` — port for the local NestJS API server)
 
 ---
 
-## 2. Running the Scraper Locally
+## 2. Local dev recipes
 
-To run the full scraping and enrichment pipeline from your machine:
+Each recipe is self-contained: fill in the listed env vars, run the
+commands, and you have a working pipeline + dashboard. All three recipes
+use the **file-based tag preference adapter** (no AWS needed) by leaving
+`DYNAMODB_TAG_PREF_TABLE_NAME` empty.
 
-```bash
-# Run with the Paris time window guard (default)
-npx tsx --tsconfig tsconfig.base.json apps/scraper/src/main.ts
+### Recipe A — Zero-cost local stack (Ollama + Notion)
 
-# Force a run now (bypassing the time window guard)
-RUN_NOW=true npx tsx --tsconfig tsconfig.base.json apps/scraper/src/main.ts
+No API quotas, no AWS. Best for everyday dev.
 
-# Or use the npm script (forces RUN_NOW=true)
-npm run scraper
-```
+1. Install Ollama and pull a model:
+   ```bash
+   ollama serve &              # or launch the Ollama menu-bar app
+   ollama pull llama3.1:8b     # ~5 GB, one-time
+   ```
+2. Create the 3 Notion databases and an integration (see [SETUP_GUIDE](SETUP_GUIDE.md#11-notion-easiest)).
+3. In `.env`:
+   ```env
+   LLM_PROVIDER=ollama
+   STORAGE_BACKEND=notion
+   NOTION_API_KEY=…
+   NOTION_INBOX_DB_ID=…
+   NOTION_ALL_DB_ID=…
+   NOTION_SAVED_DB_ID=…
+   INOREADER_EMAIL=…
+   INOREADER_PASSWORD=…
+   TELEGRAM_BOT_TOKEN=…    # optional in local dev
+   TELEGRAM_CHAT_ID=…
+   ```
+4. Provision the Notion schema, run a scrape, open the dashboard:
+   ```bash
+   npm run setup       # creates Notion properties on the 3 DBs
+   npm run scraper     # scrape → enrich → store → notify
+   npm run dev         # API on :3333, dashboard on :4200
+   ```
 
-> **Note**: In `development` mode (`NODE_ENV=development` in your `.env`), the scraper uses **local files** instead of AWS DynamoDB: `session-store.json` for the session and `tag-preferences.json` for learned tag preferences. This allows you to test the entire pipeline without an AWS account.
+### Recipe B — Free cloud LLM + Google Sheets
 
-### Fix publication dates
+Better summaries than 8B local models, still free (Gemini free tier).
 
-If existing articles have incorrect `publishedAt` dates (e.g. set to the scraping time instead of the real publication date), you can fix them in bulk:
+1. Get a Gemini API key (see [SETUP_GUIDE](SETUP_GUIDE.md#22-gemini-google-ai-studio)).
+2. Create a service account, share the spreadsheet (see [SETUP_GUIDE](SETUP_GUIDE.md#12-google-sheets)).
+3. In `.env`:
+   ```env
+   LLM_PROVIDER=gemini
+   GEMINI_API_KEY=…
+   STORAGE_BACKEND=google-sheets
+   GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account",…}
+   GOOGLE_SHEET_ID=…
+   INOREADER_EMAIL=… INOREADER_PASSWORD=…
+   TELEGRAM_BOT_TOKEN=… TELEGRAM_CHAT_ID=…
+   ```
+4. Same commands as Recipe A: `npm run setup && npm run scraper && npm run dev`.
 
-```bash
-npm run fix-dates
-```
+### Recipe C — DynamoDB Local (closest to prod)
 
-This script fetches each article's source URL, extracts the real publication date from HTML meta tags (`article:published_time`, `datePublished`, JSON-LD, etc.), and updates the storage. Articles where no date can be found are skipped.
+Mirrors the AWS deployment. Useful for testing storage code paths.
 
----
-
-## 3. Running the Dashboard Locally
-
-The dashboard needs two processes: the NestJS API and the Angular dev server. The Angular dev server proxies all `/api` calls to `localhost:3333` automatically (`apps/dashboard/proxy.conf.json`).
-
-```bash
-# Start both simultaneously (recommended)
-npm run dev
-
-# Or start each in a separate terminal
-npm run api        # NestJS API  →  http://localhost:3333/api
-npm run dashboard  # Angular UI  →  http://localhost:4200
-```
-
-First run after a fresh clone may take ~30 s while NX builds the project graph and Angular compiles.
-
-> **API token**: the dashboard requires an `x-telegram-bot-api-secret-token` header on every request. Set it in the Settings panel (gear icon, top right). If `TELEGRAM_SECRET_TOKEN` is not set in your `.env`, the API accepts all requests without a token.
-
----
-
-## 4. Notion Storage Configuration
-
-If you use `STORAGE_BACKEND=notion`:
-
-### 4.1 Create an integration
-1. Go to https://www.notion.so/my-integrations
-2. Create a new integration and copy the API key (`NOTION_API_KEY`)
-
-### 4.2 Create the 3 databases and provision the schema
-Create 3 empty Notion databases (Inbox, All, Saved), share each one with your integration, set the 3 IDs in `.env`, then run:
-```bash
-npm run setup
-```
-This creates all required properties automatically. You can also run it on an existing database to add missing columns without affecting existing data.
-
-Required properties (created by `npm run setup`):
-
-| Property | Notion Type |
-|----------|-------------|
-| Title | Title (default) |
-| Article ID | Rich text |
-| Run At | Rich text |
-| Published At | Rich text |
-| Source | Rich text |
-| URL | URL |
-| Tags | Rich text |
-| Summary | Rich text |
-| Importance | Rich text |
-| Content Unavailable | Checkbox |
-| LLM Provider | Rich text |
-| Summary Language | Rich text |
-| Scraper Source | Rich text |
-| Snoozed Until | Rich text |
-| Relevance Score | Number |
-
-### 4.3 Share the databases and set IDs
-For each database, click **"..."** > **"Connections"** > add your integration.
-
-### 4.4 Retrieve the IDs
-The database ID is found in its URL:
-```
-https://www.notion.so/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx?v=...
-                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                      This is the database ID
-```
-
-Set `NOTION_INBOX_DB_ID`, `NOTION_ALL_DB_ID`, and `NOTION_SAVED_DB_ID` in `.env`.
+1. Start DynamoDB Local:
+   ```bash
+   docker run -p 8000:8000 amazon/dynamodb-local
+   ```
+2. In `.env`:
+   ```env
+   STORAGE_BACKEND=dynamodb
+   DYNAMODB_ENDPOINT=http://localhost:8000
+   DYNAMODB_ARTICLES_TABLE_NAME=feed-digest-articles
+   DYNAMODB_TAG_PREF_TABLE_NAME=feed-digest-tag-prefs
+   AWS_REGION=eu-central-1
+   AWS_ACCESS_KEY_ID=local
+   AWS_SECRET_ACCESS_KEY=local
+   ```
+3. `npm run setup` creates both tables, then `npm run scraper && npm run dev`.
 
 ---
 
-## 5. Importance Computation
+## 3. Commands cheat sheet
 
-Article importance (`high` / `medium` / `low`) is computed at enrichment time from the relevance score and tag preferences, evaluated in strict priority order:
+| Command            | What it does                                                         |
+|--------------------|----------------------------------------------------------------------|
+| `npm run scraper`  | One full pipeline run: scrape Inoreader → enrich → store → notify    |
+| `npm run dev`      | API (`:3333`) + Angular dashboard (`:4200`) in parallel              |
+| `npm run api`      | API only (NestJS)                                                    |
+| `npm run dashboard`| Dashboard only (Angular dev server, proxies `/api` → `:3333`)        |
+| `npm run setup`    | Provisions schema for the active `STORAGE_BACKEND` (Notion/Sheets/DDB) |
+| `npm run fix-dates`| Bulk-corrects `publishedAt` by refetching real dates from source pages |
+| `npm run recover`  | Re-enriches untagged inbox items and re-sends the Telegram summary   |
+| `npm run purge`    | Deletes items older than `RETENTION_DAYS_ALL` (default 30)           |
+| `npm run build`    | `nx run-many -t build` (all apps and libs)                           |
+| `npm run test`     | `nx run-many -t test`                                                |
+| `npm run lint`     | `nx run-many -t lint`                                                |
+| `npm run release`  | `nx release` (conventional commits → version bump + CHANGELOG)       |
 
-| Priority | Condition | Importance |
-|----------|-----------|------------|
-| 1 | Any tag has `auto` override | **high** |
-| 2 | All tags have `filtered` override | **low** |
-| 3 | `relevanceScore ≥ 7` | **high** |
-| 4 | Any tag's selection score ≥ `TAG_PREFERENCE_THRESHOLD` (after ≥ `TAG_PREFERENCE_MIN_RUNS` presentations) | **high** |
-| 5 | `relevanceScore ≤ 3` | **low** |
-| 6 | Default | **medium** |
-
-If `USER_INTERESTS` is not configured, `relevanceScore` is not generated by the LLM and rules 3 and 5 never apply — everything defaults to **medium** unless you set tag overrides.
-
-**`relevanceScore`** (1–10) is produced by the LLM during enrichment based on your interest profile (`USER_INTERESTS`). Edit this profile in the **Interests** tab of the dashboard or directly in `.user-interests.txt`.
-
-**Tag preference learning:** each time you save or delete an article via the dashboard (or triage), the API calls `tagPreference.record()` using `TELEGRAM_CHAT_ID` as the identifier. Saved articles record their tags as selected (`true`); deleted articles record their tags as presented but not selected (`false`). A score `selectionCount / presentedCount` is computed per tag. Tags that consistently appear in saved articles eventually contribute to **high** importance (rule 4 above).
-
-**Tag overrides** take absolute priority (rules 1–2) and are set via the **Tag Preferences** tab:
-- **`auto`** — tag always pushes importance to **high**.
-- **`filtered`** — tag hides the article and pushes importance to **low** when all tags are filtered.
-- **`default`** (no override) — score-based behavior.
-
-**Storage:** `tag-preferences.json` locally (`NODE_ENV=development`), DynamoDB table (`DYNAMODB_TAG_PREF_TABLE_NAME`) in production.
+> **Dashboard auth.** Every API call requires the
+> `x-telegram-bot-api-secret-token` header. Set it from the dashboard
+> settings panel (gear icon). If `TELEGRAM_SECRET_TOKEN` is empty in
+> `.env`, the API accepts all requests — convenient for local dev.
 
 ---
 
-## 6. Dashboard (Angular)
+## 4. Architecture
 
-The dashboard is a standalone Angular web application for visualizing and managing tag preferences.
+Hexagonal (ports & adapters) in an Nx monorepo.
 
-### Running locally
-```bash
-npx nx serve dashboard
 ```
-The app will be available at `http://localhost:4200`.
-
-### Features
-
-**Inbox**
-- Browse all inbox articles with title, source, tags, importance, relevance score, and publication date
-- Stats bar: total count, high/medium/low breakdown, unique tag count, and untagged counter — if untagged articles exist, a "Taguer" button re-runs LLM enrichment on them with a live streaming progress bar
-- Top 10 tags and top 5 sources histograms (clickable to activate filters)
-- Temporal histogram (day / week / month / year granularity, clickable to filter by time range)
-- AI summary generation for today / this week / this month / all / currently filtered articles
-- Expand any article to view its full summary and metadata
-- Filter by importance, source (multi-select), scraper source, tags (multi-select), time range, and free-text search (title + summary + tags)
-- Sort by published date, run date, importance, or relevance score
-- Bulk selection (per-article or select-all visible) with bulk delete and bulk save
-- Tag-based clustering view: collapsible cluster groups, "Save best + archive rest" action, bulk save/delete per cluster, cluster synthesis via LLM, warning when untagged articles may degrade clustering quality
-- Snooze articles with presets
-- Keyboard shortcuts (`?` to list)
-- "Read" button to open articles in focus mode reader view
-
-**Triage**
-- Single-article-at-a-time quick processing with keyboard shortcuts (Save / Pass / Skip)
-
-**Saved**
-- Browse all saved articles with the same filtering and sorting as Inbox
-- Bulk remove
-
-**Snoozed**
-- View all snoozed articles with their snooze expiry date; unsnooze on demand
-
-**Tag Preferences**
-- View all tracked tags with selection scores (progress bars)
-- Filter by state (All / Auto / Default / Filtered) and search by name
-- Change tag state directly from the table
-- Stats: run count, tag counts by state, average selection rate, threshold
-- Reset all preferences
-
-**Interests**
-- Edit your interest profile as free text (e.g. `"AI, distributed systems, climate tech"`)
-- Stored as `.user-interests.txt`, injected into the LLM enrich prompt — drives `relevanceScore` (1–10) and therefore article importance
-
-**Reader (Focus Mode)**
-- Clean reading view accessible via `/reader/:articleId/:source`
-- 70ch typography, reading time estimate, table of contents panel
-- Toggle between article summary and full original content (fetched on demand)
-- Relevance score and tags display; direct link to original article
-
-### API Endpoints
-The dashboard connects to the NestJS REST API. All requests require the `x-telegram-bot-api-secret-token` header (set your API token in the dashboard settings).
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/inbox` | List active (non-snoozed) articles |
-| `GET` | `/api/inbox/snoozed` | List snoozed articles |
-| `POST` | `/api/inbox/retag-untagged` | Re-enrich untagged inbox articles via LLM — streams SSE progress events (`start` / `progress` / `done` / `error`) |
-| `POST` | `/api/inbox/bulk-delete` | Delete multiple articles (`{ "articleIds": [...] }`) |
-| `POST` | `/api/inbox/save` | Move articles to saved (`{ "articleIds": [...] }`) |
-| `POST` | `/api/inbox/summary` | Generate an AI summary — body: `{ "period": "today" \| "week" \| "month" }` (omit for all) |
-| `POST` | `/api/inbox/synthesize` | Synthesize selected articles via LLM (`{ "articleIds": [...] }`) |
-| `POST` | `/api/inbox/:articleId/snooze` | Snooze an article (`{ "snoozedUntil": "ISO 8601 date" }`) |
-| `POST` | `/api/inbox/:articleId/unsnooze` | Unsnooze an article |
-| `DELETE` | `/api/inbox/:articleId` | Delete a single article |
-| `GET` | `/api/saved` | List all saved articles |
-| `DELETE` | `/api/saved/:articleId` | Remove a single article from saved |
-| `POST` | `/api/saved/bulk-delete` | Remove multiple articles from saved (`{ "articleIds": [...] }`) |
-| `GET` | `/api/preferences/:chatId` | Get preferences with computed scores, overrides, and run count |
-| `POST` | `/api/preferences/:chatId/tags/:tag/override` | Set a tag override (`{ "override": "auto" \| "filtered" \| null }`) |
-| `DELETE` | `/api/preferences/:chatId` | Reset all preferences |
-| `GET` | `/api/interests` | Get user interest profile (text) |
-| `POST` | `/api/interests` | Save user interest profile (`{ "text": "..." }`) |
-| `GET` | `/api/articles/:articleId/content` | Fetch full article content (HTML + word count) |
-| `GET` | `/api/articles/:articleId/toc` | Extract table of contents (h2/h3 headings) |
-
----
-
-## 7. Working without DynamoDB Locally
-
-If you want to test the `DynamoDbAdapter` locally:
-1. **Install DynamoDB Local**: Use Docker: `docker run -p 8000:8000 amazon/dynamodb-local`.
-2. **Configure Adapter**: Pass `endpoint: 'http://localhost:8000'` and dummy credentials to the `DynamoDBClient` in your adapter (only for local dev).
-
----
-
-## 8. Production Configuration (AWS & GitHub)
-
-### 8.1 AWS SSM Parameters (One-time)
-Populate your production secrets in AWS SSM (SecureString):
-```bash
-# Example for one parameter (repeat for all needed by serverless.yml)
-aws ssm put-parameter \
-  --name /feed-digest/prod/TELEGRAM_BOT_TOKEN \
-  --value "your-token" \
-  --type SecureString \
-  --region eu-central-1
+libs/core/           pure domain — entities, ports, utilities, no I/O
+libs/adapters/       concrete implementations of every port
+  scraper/           InoreaderScraper, CompositeScraper
+  storage/           NotionStorage, GoogleSheetsStorage, DynamoDbStorage
+  llm/               ClaudeLlm, GeminiLlm, OllamaLlm
+  notifier/          TelegramNotifier
+  tag-preference/    DynamoDbTagPreference, FileTagPreference
+  factories.ts       env-driven adapter selection (createStorage, createLlm, …)
+libs/pipeline/       runPipeline orchestration + computeImportance
+apps/scraper/        CLI composition root (main.ts) + scripts (setup, recover, fix-dates, purge)
+apps/api/            NestJS — dashboard backend (local) and Lambda handler (prod)
+apps/dashboard/      Angular SPA — inbox, triage, saved, snoozed, prefs, interests, reader
 ```
 
-### 8.2 GitHub Secrets
-Add these secrets to your GitHub Repository:
-- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
-- `INOREADER_EMAIL` / `INOREADER_PASSWORD`
-- `ANTHROPIC_API_KEY` / `GEMINI_API_KEY`
-- `GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_SHEET_ID` (if Google Sheets)
-- `NOTION_API_KEY` / `NOTION_INBOX_DB_ID` / `NOTION_ALL_DB_ID` / `NOTION_SAVED_DB_ID` (if Notion)
-- `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`
-
-### 8.3 GitHub Variables
-Add these variables (Settings > Secrets and variables > Actions > Variables):
-- `LLM_PROVIDER` — `claude`, `gemini`, or `ollama` (local only — not for GitHub Actions)
-- `SUMMARY_LANG` — `fr` or `en`
-- `ARTICLES_LIMIT` — max articles per run (default: `150`)
-- `MAX_TAGS` — max tags per article (default: `3`)
-- `PIPELINE_CONCURRENCY` — parallel enrichments (default: `5`)
-- `PIPELINE_MIN_DELAY_MS` / `PIPELINE_MAX_DELAY_MS` — rate-limit jitter
-- `SCRAPER_SOURCE` — `inoreader`, `inoreader-saved`, or both
-- `STORAGE_BACKEND` — `google-sheets` or `notion`
-- `TAG_PREFERENCE_THRESHOLD` / `TAG_PREFERENCE_MIN_RUNS` — auto-selection tuning
-- `USER_INTERESTS` — free-text interest profile for LLM relevance scoring
-
-### 8.4 Deployment
-Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployment, and the `scraper` workflow will run six times daily every 3 hours (07h, 10h, 13h, 16h, 19h, 22h Paris time — with both winter/summer UTC variants). The `TZ=Europe/Paris` env var ensures logs and Telegram notifications display Paris time.
+Per-package READMEs: [`libs/core`](libs/core/README.md),
+[`libs/adapters`](libs/adapters/README.md),
+[`libs/pipeline`](libs/pipeline/README.md).
 
 ---
 
-## 9. Project Architecture Reminder
-- **libs/core**: Pure domain logic, models, and port interfaces. No external dependencies.
-- **libs/adapters**: Concrete implementations:
-  - `scraper/inoreader.scraper.ts` — InoReader scraping via Playwright
-  - `storage/google-sheets.storage.ts` — Google Sheets storage
-  - `storage/notion.storage.ts` — Notion database storage
-  - `llm/claude.llm.ts` / `llm/gemini.llm.ts` / `llm/ollama.llm.ts` — LLM enrichment (cloud or local via Ollama)
-  - `notifier/telegram.notifier.ts` — Telegram notifications
-  - `session/dynamodb.adapter.ts` / `session/in-memory-session.adapter.ts` — Session persistence
-  - `tag-preference/dynamodb.tag-preference.ts` / `tag-preference/file.tag-preference.ts` — Tag preference learning
-- **libs/pipeline**: Orchestration (the "Glue") between the ports.
-- **apps/scraper**: CLI entry point (composition root).
-- **apps/api**: NestJS API server (dashboard backend + AWS Lambda handler).
-- **apps/dashboard**: Angular web UI: inbox browser (with clustering, snooze, relevance scores), saved articles, triage, tag preferences, snoozed articles, user interests, focus mode reader.
+## 5. Pipeline flow
+
+`runPipeline()` in `libs/pipeline/src/lib/pipeline.ts`:
+
+1. **Collect** — `scraper.collect(limit)` returns up to `ARTICLES_LIMIT`
+   raw items per source listed in `SCRAPER_SOURCE`.
+2. **Fetch content** — full text via Mozilla Readability; real
+   `publishedAt` extracted from `<meta>` tags / JSON-LD.
+3. **Deduplicate & filter noise** — SHA-256 URL dedup, then drop items
+   with empty or near-empty extractable text.
+4. **Enrich (LLM)** — `llm.enrich()` returns
+   `{ summary, tags, relevanceScore }`. Concurrency = `PIPELINE_CONCURRENCY`,
+   with a random delay between calls bounded by `PIPELINE_{MIN,MAX}_DELAY_MS`.
+5. **Compute importance** — see §6.
+6. **Persist** — every article lands in Inbox + All. Starred items
+   (`inoreader-saved`) also go to Saved and are unstarred on Inoreader.
+7. **Notify** — single Telegram message: funnel (collected → deduped →
+   noise-filtered → processed), importance breakdown, average relevance,
+   top sources, LLM call/token usage, run duration.
+
+---
+
+## 6. Importance computation
+
+Implemented in `libs/pipeline/src/lib/pipeline.ts` (`computeImportance`),
+evaluated in strict priority order:
+
+| Priority | Condition                                                                                       | Importance |
+|----------|-------------------------------------------------------------------------------------------------|------------|
+| 1        | Any tag has `auto` override                                                                     | **high**   |
+| 2        | All tags have `filtered` override                                                               | **low**    |
+| 3        | `relevanceScore ≥ 7`                                                                            | **high**   |
+| 4        | Any tag's selection score ≥ `TAG_PREFERENCE_THRESHOLD` after ≥ `TAG_PREFERENCE_MIN_RUNS` runs    | **high**   |
+| 5        | `relevanceScore ≤ 3`                                                                            | **low**    |
+| 6        | Default                                                                                         | **medium** |
+
+- **`relevanceScore` (1–10)** is produced by the LLM at enrich time when
+  `USER_INTERESTS` is set; without it, rules 3 and 5 never fire.
+- **Tag preference learning**: saving/deleting an article from the
+  dashboard calls `tagPreference.record()`. A per-tag score
+  `selectionCount / presentedCount` accrues over runs.
+- **Tag overrides** (`auto` / `filtered` / default) are set in the
+  Tag Preferences dashboard tab; they take absolute priority.
+
+---
+
+## 7. Dashboard
+
+Angular standalone app at `http://localhost:4200`. Proxies `/api` to
+the NestJS server on `:3333` (`apps/dashboard/proxy.conf.json`).
+
+**Views**
+
+- **Inbox** — list/cluster views, filters (importance, source, scraper
+  source, tags, time range, free-text), sorts (date / run / importance /
+  score), bulk save/delete, snooze presets, AI summary on any subset,
+  one-click re-enrichment of untagged items via SSE progress, temporal
+  histogram, top tags/sources charts (click-to-filter), keyboard
+  shortcuts (`?`).
+- **Triage** — single-article quick processing (Save / Pass / Skip)
+  with shortcuts.
+- **Saved** — saved articles browser, same filters/sorts as Inbox.
+- **Snoozed** — snoozed list with expiry, manual unsnooze.
+- **Tag preferences** — selection scores, override per tag
+  (`auto` / `filtered` / default), reset.
+- **Interests** — free-text profile persisted in `.user-interests.txt`,
+  drives `relevanceScore`.
+- **Reader** — clean focus mode (`/reader/:articleId/:source`) with
+  70ch typography, ToC, summary/full-content toggle.
+
+### API endpoints
+
+All require header `x-telegram-bot-api-secret-token` (skipped when
+`TELEGRAM_SECRET_TOKEN` is empty).
+
+| Method   | Endpoint                                            | Description                                            |
+|----------|-----------------------------------------------------|--------------------------------------------------------|
+| `GET`    | `/api/inbox`                                        | List active (non-snoozed) articles                     |
+| `GET`    | `/api/inbox/snoozed`                                | List snoozed articles                                  |
+| `POST`   | `/api/inbox/retag-untagged`                         | Re-enrich untagged inbox via LLM (SSE progress)        |
+| `POST`   | `/api/inbox/bulk-delete`                            | `{ articleIds: [...] }`                                |
+| `POST`   | `/api/inbox/save`                                   | Move articles to saved                                 |
+| `POST`   | `/api/inbox/summary`                                | AI summary (`{ period: 'today' \| 'week' \| 'month' }`) |
+| `POST`   | `/api/inbox/synthesize`                             | Synthesize selected articles                           |
+| `POST`   | `/api/inbox/:articleId/snooze`                      | `{ snoozedUntil: ISO-8601 }`                           |
+| `POST`   | `/api/inbox/:articleId/unsnooze`                    |                                                        |
+| `DELETE` | `/api/inbox/:articleId`                             |                                                        |
+| `GET`    | `/api/saved`                                        |                                                        |
+| `DELETE` | `/api/saved/:articleId`                             |                                                        |
+| `POST`   | `/api/saved/bulk-delete`                            |                                                        |
+| `GET`    | `/api/preferences/:chatId`                          | Scores, overrides, run count                           |
+| `POST`   | `/api/preferences/:chatId/tags/:tag/override`       | `{ override: 'auto' \| 'filtered' \| null }`           |
+| `DELETE` | `/api/preferences/:chatId`                          | Reset all preferences                                  |
+| `GET`    | `/api/interests`                                    |                                                        |
+| `POST`   | `/api/interests`                                    | `{ text: '...' }`                                      |
+| `GET`    | `/api/articles/:articleId/content`                  | Full HTML + word count                                 |
+| `GET`    | `/api/articles/:articleId/toc`                      | h2/h3 outline                                          |
+
+---
+
+## 8. Production deployment
+
+The `apps/api` Lambda is deployed via the Serverless framework; the
+scraper runs on GitHub Actions in the official Playwright container.
+
+- **AWS SSM (one-time)** — store every production secret as `SecureString`
+  under `/feed-digest/prod/<KEY>`. The Serverless config wires them into
+  the Lambda env at deploy time.
+- **GitHub Actions secrets** — `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+  `INOREADER_EMAIL`, `INOREADER_PASSWORD`, the LLM API key, the Notion or
+  Google credentials, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+- **GitHub Actions variables** — `LLM_PROVIDER` (cloud only;
+  `ollama` is local-only), `STORAGE_BACKEND`, `SCRAPER_SOURCE`,
+  `SUMMARY_LANG`, `ARTICLES_LIMIT`, `MAX_TAGS`, `PIPELINE_CONCURRENCY`,
+  `PIPELINE_{MIN,MAX}_DELAY_MS`, `TAG_PREFERENCE_THRESHOLD`,
+  `TAG_PREFERENCE_MIN_RUNS`, `USER_INTERESTS`.
+- **Deploy** — push to `main`. `deploy-lambda.yml` handles the API
+  deployment; `scraper.yml` runs the pipeline every 3 hours from 07h to
+  22h Paris time inside `mcr.microsoft.com/playwright:v1.58.2-noble`.

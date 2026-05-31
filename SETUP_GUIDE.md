@@ -1,101 +1,128 @@
-# 🛠 Configuration Guide — step-by-step
+# Setup guide — third-party credentials
 
-This guide explains in detail how to find each parameter needed for the `.env` file.
-
----
-
-## 1. Google Sheets Integration
-
-### 1.1 Finding your Google Sheet ID
-1. Open your Google Spreadsheet in your browser.
-2. Look at the URL in the address bar.
-3. The ID is the long string of characters between `/d/` and `/edit`.
-   - URL: `https://docs.google.com/spreadsheets/d/1A_B_C_123_XYZ/edit#gid=0`
-   - **Sheet ID**: `1A_B_C_123_XYZ`
-
-### 1.2 Creating a Service Account (JSON)
-To allow the script to write to your sheet without manual login:
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new **Project** (e.g., "Inoreader Digest").
-3. Go to **APIs & Services** > **Library** and search for **"Google Sheets API"**. Click **Enable**.
-4. Go to **IAM & Admin** > **Service Accounts**.
-5. Click **"Create Service Account"**. Give it a name and click **"Create and Continue"**.
-6. (Optional) Skip roles for now. Click **"Done"**.
-7. In the list, click on your new service account's email.
-8. Go to the **"Keys"** tab.
-9. Click **"Add Key"** > **"Create new key"** > **JSON**.
-10. A file will download to your computer. Open it with a text editor.
-11. **IMPORTANT**: Copy the entire content and put it in your `.env` for `GOOGLE_SERVICE_ACCOUNT_JSON`. It must be on one single line.
-
-### 1.3 Sharing the Sheet
-For the script to have permission to write:
-1. Open your Google Sheet.
-2. Click **Share** (top right).
-3. Copy the `client_email` address from your service account JSON (it looks like `account-name@project-id.iam.gserviceaccount.com`).
-4. Paste it into the "Share" field and give it **Editor** permissions.
+This guide is purely about external services: how to create the accounts,
+obtain the keys, and grant the right permissions. Everything that
+concerns the code itself (commands, env vars, recipes, architecture)
+lives in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ---
 
-## 2. LLM Providers (AI)
+## 1. Storage backends
+
+### 1.1 Notion (easiest)
+
+1. Create an integration at <https://www.notion.so/my-integrations>.
+   Copy the **Internal Integration Token** into `NOTION_API_KEY`.
+2. Create **3 empty databases** in any workspace you can share with the
+   integration: `Inbox`, `All`, `Saved`. For each one, click `…` →
+   `Connections` → add your integration.
+3. The database ID is the 32-char hex in the URL:
+   ```
+   https://www.notion.so/<db-id>?v=…
+                          ^^^^^^^^^
+   ```
+   Copy the IDs into `NOTION_INBOX_DB_ID`, `NOTION_ALL_DB_ID`,
+   `NOTION_SAVED_DB_ID`.
+4. Run `npm run setup` — it provisions every required property on the
+   three databases (idempotent; safe to re-run).
+
+### 1.2 Google Sheets
+
+1. <https://console.cloud.google.com/> → create or select a project.
+2. **APIs & Services → Library** → enable **Google Sheets API**.
+3. **IAM & Admin → Service Accounts** → *Create Service Account* → skip
+   role assignment → *Done*. Open the account, **Keys** tab, *Add Key →
+   Create new key → JSON*. The JSON file downloads automatically.
+4. Open the JSON, copy the whole content on **one line** into
+   `GOOGLE_SERVICE_ACCOUNT_JSON` (keep the curly braces, escape nothing).
+5. Create a Google Sheet, copy the ID from its URL
+   (`/spreadsheets/d/<ID>/edit…`) into `GOOGLE_SHEET_ID`.
+6. **Share** the sheet with the service account's `client_email`
+   (visible in the JSON), grant **Editor**.
+7. `npm run setup` creates the required tabs and headers.
+
+### 1.3 DynamoDB
+
+- **Local**: just `docker run -p 8000:8000 amazon/dynamodb-local`.
+  `npm run setup` creates the tables. No AWS account required.
+- **AWS**: create the tables in the target region (`AWS_REGION`),
+  provide credentials via `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
+  or any standard AWS credentials chain. `npm run setup` works against
+  real AWS too.
+
+---
+
+## 2. LLM providers
+
+Pick **one**; set the matching `LLM_PROVIDER`.
 
 ### 2.1 Claude (Anthropic)
-1. Go to [Anthropic Console](https://console.anthropic.com/).
-2. Create an account and add credits (if needed).
-3. Go to **API Keys** and click **"Create Key"**.
+
+1. <https://console.anthropic.com/> → create an account, top up credits.
+2. **API Keys** → *Create Key* → copy into `ANTHROPIC_API_KEY`.
+3. (Optional) override the default model with `CLAUDE_MODEL`.
 
 ### 2.2 Gemini (Google AI Studio)
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey).
-2. Click **"Create API Key"**.
-3. It's often free for limited use!
+
+1. <https://aistudio.google.com/app/apikey> → *Create API Key*.
+2. Paste into `GEMINI_API_KEY`. Free tier covers small-volume dev.
+3. (Optional) override the default model with `GEMINI_MODEL`.
+
+### 2.3 Ollama (local, no API key)
+
+1. Install: <https://ollama.com/download> (macOS `.dmg`, Linux script,
+   Windows installer).
+2. Start the server: open the menu-bar app, or `ollama serve &` in a
+   terminal. Defaults to `http://localhost:11434`.
+3. Pull a model:
+   ```bash
+   ollama pull llama3.1:8b      # ~5 GB, good default
+   ollama pull qwen2.5:7b       # alternative, strong JSON adherence
+   ```
+4. Nothing to put in `.env` beyond `LLM_PROVIDER=ollama`. Override
+   `OLLAMA_BASE_URL` and `OLLAMA_MODEL` only if you diverge from the
+   defaults.
+
+> **Ollama requires version ≥ 0.5** because the adapter uses the
+> `/api/chat` `format` schema for structured JSON output.
 
 ---
 
-## 3. Telegram Bot
+## 3. Telegram
 
-### 3.1 Obtaining the API Token
-The **API Token** is the key that allows the application to control the bot.
-- **If you don't have a bot yet**:
-  1. Search for **@BotFather** on Telegram.
-  2. Send `/newbot` and follow the instructions.
-  3. At the end, @BotFather will give you the token (e.g., `123456:ABC-DEF`).
-- **If you already have a bot**:
-  1. Search for **@BotFather** in your Telegram conversations.
-  2. Send `/mybots`.
-  3. Click on the name of the bot you want to use.
-  4. Click on **API Token**.
-  5. The token will be displayed (e.g., `123456:ABC-DEF`).
+Used for the post-run summary and as the dashboard's shared-secret
+auth header.
 
-### 3.2 Finding your Personal Chat ID
-The **Chat ID** is the unique number of *your* account. This allows the bot to know who to send the messages to.
-1. Search for **@userinfobot** or **@chatIDrobot** on Telegram.
-2. Send any message to it (like "Hello").
-3. It will reply with your **Id** (a number like `123456789`).
-   - Copy this number for `TELEGRAM_CHAT_ID`.
+### 3.1 Bot token
 
-### 3.3 Starting the Bot
-**Crucial Step**: Before the bot can send you messages, you must initiate the conversation with it.
-1. Go to the URL of your bot (e.g., `https://t.me/your_bot_name`).
-2. Click on **Start** (or send `/start`).
+1. Open Telegram, talk to **@BotFather**.
+2. New bot: `/newbot`, follow the prompts. Existing bot: `/mybots` →
+   pick one → *API Token*.
+3. Copy the token (`123456:ABC…`) into `TELEGRAM_BOT_TOKEN`.
+
+### 3.2 Personal chat ID
+
+1. Talk to **@userinfobot** (or **@chatIDrobot**), send any message.
+2. Copy the numeric `Id` into `TELEGRAM_CHAT_ID`.
+3. **Start a chat with your own bot** (`https://t.me/<your-bot-name>` →
+   *Start*) so it is allowed to message you.
+
+### 3.3 Shared secret (optional but recommended)
+
+`TELEGRAM_SECRET_TOKEN` is any random string you want. The dashboard
+sends it as the `x-telegram-bot-api-secret-token` header on every API
+call. Leave empty to disable auth (handy in local dev).
 
 ---
 
-## 4. InoReader
-1. Use your standard login email and password.
-2. Note: If you have 2FA (Two-Factor Authentication) enabled on Inoreader, you might need to disable it or create an app password if available (currently scraping assumes no 2FA).
+## 4. Inoreader
 
----
+Use your normal login email and password (`INOREADER_EMAIL`,
+`INOREADER_PASSWORD`). The scraper drives a real headless browser, so:
 
-## 5. Summary Table for .env
-
-| Variable | Source | Example |
-|---|---|---|
-| `INOREADER_EMAIL` | Your Inoreader account | `me@email.com` |
-| `LLM_PROVIDER` | Choose `claude`, `gemini`, or `ollama` (local) | `claude` |
-| `GOOGLE_SHEET_ID` | Spreadsheet URL | `1_ABC_..._XYZ` |
-| `TELEGRAM_CHAT_ID` | @userinfobot on Telegram | `123456789` |
-| `TELEGRAM_BOT_TOKEN` | @BotFather on Telegram | `123456:ABC-DEF` |
-| `DYNAMODB_TAG_PREF_TABLE_NAME` | AWS DynamoDB table name | `feed-digest-tag-prefs` |
-| `TAG_PREFERENCE_THRESHOLD` | Auto-selection score threshold | `0.6` |
-| `TAG_PREFERENCE_MIN_RUNS` | Minimum runs before auto-selection | `3` |
-| `USER_INTERESTS` | Free-text interest profile for relevance scoring | `web dev, AI, security` |
-| `API_PORT` | Local dashboard API port | `3333` |
+- **2FA is not supported.** Disable it on the Inoreader account used
+  for scraping, or create a dedicated account.
+- The selector targets the *password* sign-in button explicitly, so
+  passkey buttons on the login page don't interfere.
+- A successful login persists cookies to `session.json` at the project
+  root; subsequent runs skip the login flow until the session expires.

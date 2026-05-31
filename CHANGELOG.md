@@ -26,32 +26,6 @@
 - **dashboard:** force YYYY-MM-DD HH:mm date format regardless of browser locale ([f20a0bb](https://github.com/pandaco/feed-digest/commit/f20a0bb))
 - **scraper:** fix setup script for Notion type check and Google Sheets column order ([9ed4ce0](https://github.com/pandaco/feed-digest/commit/9ed4ce0))
 
-## Unreleased
-
-### 🚀 Features
-
-- **dashboard:** enhance search with tag matching and relevance scoring ([133acad](https://github.com/pandaco/feed-digest/commit/133acad))
-- **core:** add article snooze with presets and dedicated page ([a1ad0ea](https://github.com/pandaco/feed-digest/commit/a1ad0ea))
-- **core:** add LLM relevance scoring with user interest profile ([c086879](https://github.com/pandaco/feed-digest/commit/c086879))
-- **dashboard:** add tag-based article clustering with synthesis ([8b36a56](https://github.com/pandaco/feed-digest/commit/8b36a56))
-- **dashboard:** add focus mode reader view with clean typography ([a61966c](https://github.com/pandaco/feed-digest/commit/a61966c))
-- **core:** add table of contents extraction for long articles ([bde1007](https://github.com/pandaco/feed-digest/commit/bde1007))
-- **core:** add LLM usage tracking (calls + tokens) and rich Telegram notification with pipeline funnel, importance, relevance, top sources ([91b61ee](https://github.com/pandaco/feed-digest/commit/91b61ee))
-- **dashboard:** enhance cluster view with per-article dates, checkboxes, bulk save/delete, recursive splitting for large clusters, refresh button, and consistent page layouts ([c7f0823](https://github.com/pandaco/feed-digest/commit/c7f0823))
-- **ci:** run every 3h from 07h to 22h Paris time (6 daily slots) with TZ=Europe/Paris for correct timestamps ([3e58571](https://github.com/pandaco/feed-digest/commit/3e58571))
-- **scraper:** generic `npm run setup` command to provision schema for Notion or Google Sheets ([2f55350](https://github.com/pandaco/feed-digest/commit/2f55350))
-
-### 🩹 Fixes
-
-- **adapters:** send Relevance Score as Notion number type instead of rich_text ([d50a2e8](https://github.com/pandaco/feed-digest/commit/d50a2e8))
-- **adapters:** gracefully skip missing optional Notion properties (Relevance Score, Snoozed Until, Scraper Source) ([bb8fa6f](https://github.com/pandaco/feed-digest/commit/bb8fa6f))
-- **ci:** install chromium-headless-shell via playwright-core to fix Playwright 1.58 headless binary ([0888155](https://github.com/pandaco/feed-digest/commit/0888155))
-
-### 🔧 Improvements
-
-- **pipeline:** remove summarizeRun LLM call and interactive Telegram features to save tokens
-- **dashboard:** remove confirm() dialogs from inbox and saved pages for faster triaging
-
 ## 0.2.0 (2026-04-02)
 
 ### 🚀 Features
