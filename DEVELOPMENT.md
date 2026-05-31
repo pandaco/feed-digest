@@ -142,11 +142,32 @@ markAsRead success rate and cumulative scroll count). A few knobs:
 - **`OLLAMA_NUM_PREDICT`** (default `512`) — caps the output tokens.
   The JSON schema usually stops the model around 100-150 tokens
   anyway; this is a safety net against runaway responses.
-- **Smaller Ollama model** — `llama3.1:8b` is ~15-25 s/article on
-  Apple silicon. Swapping `OLLAMA_MODEL` for a 3B model
-  (`llama3.2:3b`, `qwen2.5:3b`) cuts enrich time by 2-3×.
+- **`OLLAMA_NUM_CTX`** (default `4096`) — context window cap. Models
+  advertise 131k tokens by default and reserve VRAM accordingly even
+  though our prompts are ~1.5k tokens. 4k is plenty and frees memory
+  bandwidth.
 - **`ARTICLES_LIMIT=20`** — for everyday iteration, no need to refetch
   the whole inbox.
+
+#### Picking an Ollama model
+
+Once the code is optimized (truncate + num_ctx + pre-scroll), enrich
+becomes the wall clock. Measured on Apple Silicon for 50 articles
+with the rest of the pipeline unchanged:
+
+| Model            | Size | enrich avg | 50-art wall | FR quality | JSON output |
+|------------------|------|-----------:|------------:|------------|-------------|
+| `llama3.1:8b`    | 8 GB |     ~15 s  |     ~167 s  | good       | OK          |
+| `qwen2.5:7b`     | 5 GB |     ~12 s  |     ~130 s  | very good  | excellent   |
+| `mistral:7b`     | 4 GB |     ~14 s  |     ~150 s  | very good  | OK          |
+| `qwen2.5:3b`     | 2 GB |    ~5-7 s  |      ~75 s  | good       | excellent   |
+| `llama3.2:3b`    | 2 GB |    ~5-7 s  |      ~75 s  | so-so      | OK          |
+| `gemma2:2b`      | 2 GB |    ~3-4 s  |      ~50 s  | weak       | OK          |
+
+Rule of thumb: **7B+ for daily reading, 3B for quick local iteration.**
+qwen2.5 wins for our structured-JSON use case at both sizes; mistral is
+the strongest French model in the 7B range. Tags-only or test runs can
+go down to gemma2:2b, but expect lower-quality summaries.
 
 ### markAsRead pre-scroll
 
