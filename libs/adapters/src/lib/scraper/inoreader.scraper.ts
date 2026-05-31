@@ -321,6 +321,36 @@ export class InoreaderScraper implements ScraperPort {
     return null;
   }
 
+  /**
+   * Pre-scroll the markRead page to lazy-load `expectedCount` items into
+   * the DOM up front. Each subsequent `markAsRead` then finds its target
+   * by direct selector without scrolling, dropping per-article cost from
+   * ~5s (15 forced scrolls) to <500ms.
+   */
+  async prepareForMarkAsRead(expectedCount: number): Promise<void> {
+    const page = await this.initMarkReadPage();
+    // Target ~2× expectedCount so removals from the list (each mark
+    // shrinks the DOM) still leave enough loaded ahead.
+    const target = Math.max(expectedCount * 2, 20);
+    // Hard scroll cap. Each scroll loads ~5 articles, so 60 scrolls
+    // covers ~300 items — well beyond any realistic batch.
+    const maxScrolls = Math.min(60, Math.ceil(target / 4));
+    let loaded = await page.$$eval('[data-aid]', els => els.length);
+    let scrolls = 0;
+    while (loaded < target && scrolls < maxScrolls) {
+      await page.evaluate(() => window.scrollBy(0, 2000));
+      await page.waitForTimeout(350);
+      const next = await page.$$eval('[data-aid]', els => els.length);
+      if (next === loaded) break; // hit the bottom of the list
+      loaded = next;
+      scrolls++;
+    }
+    // Back to the top so per-article search starts where items live.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(150);
+    console.log(`[InoreaderScraper] Pre-loaded ${loaded} items into markRead DOM (${scrolls} scroll${scrolls === 1 ? '' : 's'}).`);
+  }
+
   async markAsRead(articleId: string, url: string): Promise<MarkAsReadResult> {
     const action = this.mode === 'starred' ? 'unstar' : 'mark-as-read';
     const key = this.mode === 'starred' ? 's' : 'm';
@@ -330,9 +360,10 @@ export class InoreaderScraper implements ScraperPort {
     try {
       let container = await this.findArticleContainer(page, articleId, url);
       let scrolls = 0;
-      // 15 scrolls × 1500px ≈ ~80–100 articles ahead. Inoreader's lazy-load
-      // triggers within ~300ms of a scroll burst, so 350ms is enough.
-      for (; scrolls < 15 && !container; scrolls++) {
+      // With `prepareForMarkAsRead` called once at run start, the target
+      // is usually already in the DOM (0 scrolls). 5 is enough to absorb
+      // the cases where the list shrinks faster than expected.
+      for (; scrolls < 5 && !container; scrolls++) {
         await page.evaluate(() => window.scrollBy(0, 1500));
         await page.waitForTimeout(350);
         container = await this.findArticleContainer(page, articleId, url);

@@ -125,21 +125,38 @@ Mirrors the AWS deployment. Useful for testing storage code paths.
 
 ### Faster local runs
 
-`npm run scraper` prints per-article timings (`fetch / enrich / store`,
-in ms) followed by a perf summary table (avg / p50 / p95 / max,
-parallelism factor, throughput) so you can see exactly where the time
-goes. A few knobs that pay off:
+`npm run scraper` prints per-article timings (`fetch / enrich / store`
++ a `markRead OK in Xms (N scrolls)` line per item) followed by a perf
+summary table (avg / p50 / p95 / max, parallelism factor, throughput,
+markAsRead success rate and cumulative scroll count). A few knobs:
 
 - **`SKIP_MARK_AS_READ=true`** — keep articles unread/starred on
   Inoreader so you can iterate on the same batch repeatedly.
 - **`LLM_PROVIDER=ollama`** — the jitter between LLM calls
   (`PIPELINE_{MIN,MAX}_DELAY_MS`) is **automatically bypassed**; that
   delay only exists to spare cloud-API quotas.
-- **Smaller Ollama model** — `llama3.1:8b` is ~15-25 s/article on Apple
-  silicon. Swapping `OLLAMA_MODEL` for a 3B model (`llama3.2:3b`,
-  `qwen2.5:3b`) cuts enrich time by 2-3×.
+- **`ENRICH_CONTENT_MAX_CHARS`** (default `4000`) — truncates the
+  article body before it hits the LLM. Cuts Ollama's `prompt_eval` on
+  long posts. Lower it (e.g. `2000`) for an extra 10-20% if you're OK
+  with shorter summaries.
+- **`OLLAMA_NUM_PREDICT`** (default `512`) — caps the output tokens.
+  The JSON schema usually stops the model around 100-150 tokens
+  anyway; this is a safety net against runaway responses.
+- **Smaller Ollama model** — `llama3.1:8b` is ~15-25 s/article on
+  Apple silicon. Swapping `OLLAMA_MODEL` for a 3B model
+  (`llama3.2:3b`, `qwen2.5:3b`) cuts enrich time by 2-3×.
 - **`ARTICLES_LIMIT=20`** — for everyday iteration, no need to refetch
   the whole inbox.
+
+### markAsRead pre-scroll
+
+The pipeline calls `scraper.prepareForMarkAsRead(N)` once before any
+mark, so the InoReader markRead page lazy-loads all the upcoming items
+into the DOM in a single batch (~5-10 s for 100 items). Each subsequent
+`markAsRead` then finds its target by direct selector without
+scrolling, dropping per-article cost from ~5 s (15 forced scrolls) to
+sub-second. The pre-scroll run is logged and visible in the summary as
+near-zero `scrolls / article`.
 
 ---
 

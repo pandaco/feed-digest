@@ -27,11 +27,20 @@ const ENRICH_SCHEMA = {
 export class OllamaLlm implements LlmPort {
   private readonly baseUrl: string;
   private readonly model: string;
+  private readonly numPredict: number;
   private usage: LlmUsage = { calls: 0, inputTokens: 0, outputTokens: 0 };
 
-  constructor(baseUrl = 'http://localhost:11434', model = 'llama3.1:8b') {
+  constructor(
+    baseUrl = 'http://localhost:11434',
+    model = 'llama3.1:8b',
+    numPredict?: number,
+  ) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.model = model;
+    // Safety cap on generated tokens. With the JSON schema format the
+    // model normally stops at the closing `}` (~100–150 tokens), so this
+    // mostly catches the rare cases where it would otherwise ramble.
+    this.numPredict = numPredict ?? 512;
   }
 
   getUsage(): LlmUsage {
@@ -63,7 +72,7 @@ export class OllamaLlm implements LlmPort {
           { role: 'user', content: userPrompt },
         ],
         format: ENRICH_SCHEMA,
-        options: { temperature: 0.1, num_predict: 1024 },
+        options: { temperature: 0.1, num_predict: this.numPredict },
       });
       return this.parseResponse(response.message.content, input.title);
     } catch (error) {
@@ -84,7 +93,7 @@ export class OllamaLlm implements LlmPort {
     try {
       const response = await this.chat({
         messages: [{ role: 'user', content: userPrompt }],
-        options: { temperature: 0.3, num_predict: 1024 },
+        options: { temperature: 0.3, num_predict: this.numPredict },
       });
       return response.message.content.trim();
     } catch (error) {
@@ -117,7 +126,7 @@ ${items}`;
     try {
       const response = await this.chat({
         messages: [{ role: 'user', content: userPrompt }],
-        options: { temperature: 0.3, num_predict: 1024 },
+        options: { temperature: 0.3, num_predict: this.numPredict },
       });
       return cleanHtml(response.message.content);
     } catch (error) {

@@ -81,6 +81,16 @@ export interface ScraperPort {
   markAsRead(articleId: string, url: string): Promise<MarkAsReadResult>;
 
   /**
+   * Optional hint called once before the first `markAsRead`. Lets a
+   * scraper pre-load the upcoming items into its DOM so individual
+   * `markAsRead` calls don't each pay the cost of a full lazy-load
+   * scroll. Adapters that don't need this can leave it unimplemented.
+   *
+   * @param expectedCount Number of items that will be marked next.
+   */
+  prepareForMarkAsRead?(expectedCount: number): Promise<void>;
+
+  /**
    * Closes the scraper session and releases browser resources.
    */
   close(): Promise<void>;

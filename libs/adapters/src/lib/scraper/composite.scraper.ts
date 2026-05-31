@@ -53,6 +53,12 @@ export class CompositeScraper implements ScraperPort {
     return { ok, scrolls };
   }
 
+  async prepareForMarkAsRead(expectedCount: number): Promise<void> {
+    await Promise.all(
+      this.scrapers.map(s => s.prepareForMarkAsRead?.(expectedCount)),
+    );
+  }
+
   async close(): Promise<void> {
     for (const scraper of this.scrapers) {
       await scraper.close();

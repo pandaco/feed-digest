@@ -129,9 +129,16 @@ async function enrichAndSave(
   console.log(`[Pipeline] ${tag} Enriching via ${options.llmProvider}...`);
   const enrichStart = Date.now();
   const userInterests = process.env['USER_INTERESTS'] || '';
+  // Cap article content sent to the LLM. Readability gives us the lead
+  // structure first, so 4 000 chars is plenty for a 3–5 sentence
+  // summary and prevents Ollama's prompt_eval from ballooning on long
+  // articles (10–30k chars is common).
+  const maxChars = parseInt(process.env['ENRICH_CONTENT_MAX_CHARS'] || '4000', 10);
+  const rawContent = fullContent || meta.excerpt;
+  const enrichContent = rawContent.length > maxChars ? rawContent.slice(0, maxChars) : rawContent;
   const enrichment = await options.llm.enrich({
     title: meta.title,
-    content: fullContent || meta.excerpt,
+    content: enrichContent,
     contentUnavailable,
     language: languageName,
     maxTags: options.maxTags ?? 3,
@@ -391,6 +398,18 @@ export async function runPipeline(options: RunPipelineOptions): Promise<void> {
     }
     const markPromises: Promise<void>[] = [];
     const markTimings: MarkTiming[] = [];
+
+    // Pre-load the markRead DOM before any mark-as-read call so the
+    // serialized loop later doesn't waste 5s/article re-scrolling.
+    if (!skipMarkAsRead && options.scraper.prepareForMarkAsRead) {
+      try {
+        const prepStart = Date.now();
+        await options.scraper.prepareForMarkAsRead(metadata.length);
+        console.log(`[Pipeline] Pre-scroll for markAsRead done in ${Date.now() - prepStart}ms.`);
+      } catch (e) {
+        console.warn('[Pipeline] prepareForMarkAsRead failed (continuing):', e);
+      }
+    }
 
     const enrichStart = Date.now();
     const results = await Promise.all(metadata.map((meta, i) => limitEnrich(async () => {

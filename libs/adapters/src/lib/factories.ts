@@ -41,8 +41,12 @@ export function createLlm(label = 'App'): { llm: LlmPort; provider: LlmProvider 
       return { llm: new GeminiLlm(process.env['GEMINI_API_KEY']!, process.env['GEMINI_MODEL']), provider };
     case 'claude':
       return { llm: new ClaudeLlm(process.env['ANTHROPIC_API_KEY']!, process.env['CLAUDE_MODEL']), provider };
-    case 'ollama':
-      return { llm: new OllamaLlm(process.env['OLLAMA_BASE_URL'], process.env['OLLAMA_MODEL']), provider };
+    case 'ollama': {
+      const numPredict = process.env['OLLAMA_NUM_PREDICT']
+        ? parseInt(process.env['OLLAMA_NUM_PREDICT'], 10)
+        : undefined;
+      return { llm: new OllamaLlm(process.env['OLLAMA_BASE_URL'], process.env['OLLAMA_MODEL'], numPredict), provider };
+    }
     default:
       throw new Error(`[${label}] Unknown LLM_PROVIDER: "${provider}". Supported: claude, gemini, ollama`);
   }
