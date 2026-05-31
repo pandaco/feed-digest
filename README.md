@@ -50,8 +50,9 @@ npm run fix-dates
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `INOREADER_EMAIL` / `INOREADER_PASSWORD` | InoReader credentials | - |
-| `LLM_PROVIDER` | `claude` or `gemini` | `claude` |
-| `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` | LLM API key | - |
+| `LLM_PROVIDER` | `claude`, `gemini`, or `ollama` (local) | `claude` |
+| `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` | LLM API key (not required for `ollama`) | - |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | Ollama endpoint and model (if `ollama`) | `http://localhost:11434` / `llama3.1:8b` |
 | `STORAGE_BACKEND` | Storage backend: `google-sheets`, `notion`, or `dynamodb` | `google-sheets` |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Google service account JSON (if `google-sheets`) | - |
 | `GOOGLE_SHEET_ID` | Target Google Sheet ID (if `google-sheets`) | - |

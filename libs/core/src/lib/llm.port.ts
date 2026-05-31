@@ -1,6 +1,11 @@
 import { Article } from './article';
 
 /**
+ * Identifier of the LLM backend used for a run.
+ */
+export type LlmProvider = 'claude' | 'gemini' | 'ollama';
+
+/**
  * Input for the article enrichment process.
  */
 export interface EnrichInput {

@@ -16,10 +16,13 @@ Selected via `STORAGE_BACKEND` (`dynamodb` / `notion` / `google-sheets`).
 
 | Adapter | Provider | Env vars required |
 |---------|----------|-------------------|
-| `ClaudeAdapter` | Anthropic | `ANTHROPIC_API_KEY` |
-| `GeminiAdapter` | Google | `GEMINI_API_KEY` |
+| `ClaudeLlm` | Anthropic | `ANTHROPIC_API_KEY` (+ optional `CLAUDE_MODEL`) |
+| `GeminiLlm` | Google | `GEMINI_API_KEY` (+ optional `GEMINI_MODEL`) |
+| `OllamaLlm` | Ollama (local) | none (optional `OLLAMA_BASE_URL`, `OLLAMA_MODEL`) |
 
-Selected via `LLM_PROVIDER` (`claude` / `gemini`).
+Selected via `LLM_PROVIDER` (`claude` / `gemini` / `ollama`). The Ollama backend
+uses structured JSON output via the `/api/chat` `format` schema, so the model
+must support the JSON format mode (Ollama ≥ 0.5).
 
 ## Scraper
 

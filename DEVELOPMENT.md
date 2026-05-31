@@ -35,8 +35,8 @@ cp .env.example .env
 ```
 Fill in the following variables in `.env`:
 - `INOREADER_EMAIL` / `INOREADER_PASSWORD`
-- `ANTHROPIC_API_KEY` or `GEMINI_API_KEY`
-- `LLM_PROVIDER` (claude or gemini)
+- `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` (skip for `ollama`)
+- `LLM_PROVIDER` (`claude`, `gemini`, or `ollama` for a local model)
 - `SUMMARY_LANG` (fr or en)
 - If `STORAGE_BACKEND=google-sheets`:
   - `GOOGLE_SERVICE_ACCOUNT_JSON` (the full JSON string)
@@ -301,7 +301,7 @@ Add these secrets to your GitHub Repository:
 
 ### 8.3 GitHub Variables
 Add these variables (Settings > Secrets and variables > Actions > Variables):
-- `LLM_PROVIDER` — `claude` or `gemini`
+- `LLM_PROVIDER` — `claude`, `gemini`, or `ollama` (local only — not for GitHub Actions)
 - `SUMMARY_LANG` — `fr` or `en`
 - `ARTICLES_LIMIT` — max articles per run (default: `150`)
 - `MAX_TAGS` — max tags per article (default: `3`)
@@ -323,7 +323,7 @@ Simply push to `main`. The `deploy-lambda` workflow will handle the AWS deployme
   - `scraper/inoreader.scraper.ts` — InoReader scraping via Playwright
   - `storage/google-sheets.storage.ts` — Google Sheets storage
   - `storage/notion.storage.ts` — Notion database storage
-  - `llm/claude.llm.ts` / `llm/gemini.llm.ts` — LLM enrichment
+  - `llm/claude.llm.ts` / `llm/gemini.llm.ts` / `llm/ollama.llm.ts` — LLM enrichment (cloud or local via Ollama)
   - `notifier/telegram.notifier.ts` — Telegram notifications
   - `session/dynamodb.adapter.ts` / `session/in-memory-session.adapter.ts` — Session persistence
   - `tag-preference/dynamodb.tag-preference.ts` / `tag-preference/file.tag-preference.ts` — Tag preference learning

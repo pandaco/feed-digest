@@ -1,9 +1,10 @@
-import { LlmPort, StoragePort, TagPreferencePort } from '@feed-digest/core';
+import { LlmPort, LlmProvider, StoragePort, TagPreferencePort } from '@feed-digest/core';
 import { GoogleSheetsStorage } from './storage/google-sheets.storage';
 import { NotionStorage } from './storage/notion.storage';
 import { DynamoDbStorage } from './storage/dynamodb.storage';
 import { ClaudeLlm } from './llm/claude.llm';
 import { GeminiLlm } from './llm/gemini.llm';
+import { OllamaLlm } from './llm/ollama.llm';
 import { DynamoDbTagPreference } from './tag-preference/dynamodb.tag-preference';
 import { FileTagPreference } from './tag-preference/file.tag-preference';
 
@@ -33,15 +34,17 @@ export function createStorage(label = 'App'): StoragePort {
   }
 }
 
-export function createLlm(label = 'App'): { llm: LlmPort; provider: 'claude' | 'gemini' } {
-  const provider = (process.env['LLM_PROVIDER'] || 'claude') as 'claude' | 'gemini';
+export function createLlm(label = 'App'): { llm: LlmPort; provider: LlmProvider } {
+  const provider = (process.env['LLM_PROVIDER'] || 'claude') as LlmProvider;
   switch (provider) {
     case 'gemini':
       return { llm: new GeminiLlm(process.env['GEMINI_API_KEY']!, process.env['GEMINI_MODEL']), provider };
     case 'claude':
       return { llm: new ClaudeLlm(process.env['ANTHROPIC_API_KEY']!, process.env['CLAUDE_MODEL']), provider };
+    case 'ollama':
+      return { llm: new OllamaLlm(process.env['OLLAMA_BASE_URL'], process.env['OLLAMA_MODEL']), provider };
     default:
-      throw new Error(`[${label}] Unknown LLM_PROVIDER: "${provider}". Supported: claude, gemini`);
+      throw new Error(`[${label}] Unknown LLM_PROVIDER: "${provider}". Supported: claude, gemini, ollama`);
   }
 }
 

@@ -90,7 +90,7 @@ The **Chat ID** is the unique number of *your* account. This allows the bot to k
 | Variable | Source | Example |
 |---|---|---|
 | `INOREADER_EMAIL` | Your Inoreader account | `me@email.com` |
-| `LLM_PROVIDER` | Choose `claude` or `gemini` | `claude` |
+| `LLM_PROVIDER` | Choose `claude`, `gemini`, or `ollama` (local) | `claude` |
 | `GOOGLE_SHEET_ID` | Spreadsheet URL | `1_ABC_..._XYZ` |
 | `TELEGRAM_CHAT_ID` | @userinfobot on Telegram | `123456789` |
 | `TELEGRAM_BOT_TOKEN` | @BotFather on Telegram | `123456:ABC-DEF` |

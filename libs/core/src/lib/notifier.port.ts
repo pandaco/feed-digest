@@ -1,3 +1,5 @@
+import { LlmProvider } from './llm.port';
+
 /**
  * Metadata for a pipeline run summary.
  */
@@ -13,7 +15,7 @@ export interface RunSummary {
   /** Article count per detected tag */
   tagCounts: Record<string, number>;
   /** The AI provider used for the run */
-  llmProvider: 'claude' | 'gemini';
+  llmProvider: LlmProvider;
   /** Target language code (e.g. 'fr', 'en') */
   summaryLanguage: string;
   /** Duration of the run in milliseconds */

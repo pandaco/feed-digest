@@ -2,6 +2,7 @@ import pLimit from 'p-limit';
 import {
   Article,
   LlmPort,
+  LlmProvider,
   NotifierPort,
   ScraperPort,
   StoragePort,
@@ -18,7 +19,7 @@ export interface RunPipelineOptions {
   notifier: NotifierPort;
   summaryLang: string;
   telegramChatId: string;
-  llmProvider: 'claude' | 'gemini';
+  llmProvider: LlmProvider;
   limit?: number;
   maxTags?: number;
   concurrency?: number;

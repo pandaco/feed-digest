@@ -23,7 +23,7 @@ export interface Article {
   /** Flag indicating if the full content was accessible */
   contentUnavailable: boolean;
   /** LLM provider used for enrichment */
-  llmProvider: 'claude' | 'gemini';
+  llmProvider: import('./llm.port').LlmProvider;
   /** Language used for the summary and tags */
   summaryLanguage: string;
   /** Whether the article was marked as saved/starred in InoReader */

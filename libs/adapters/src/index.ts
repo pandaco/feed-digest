@@ -5,6 +5,7 @@ export * from './lib/storage/notion.storage';
 export * from './lib/storage/dynamodb.storage';
 export * from './lib/llm/claude.llm';
 export * from './lib/llm/gemini.llm';
+export * from './lib/llm/ollama.llm';
 export * from './lib/notifier/telegram.notifier';
 export * from './lib/tag-preference/dynamodb.tag-preference';
 export * from './lib/tag-preference/file.tag-preference';

@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import { TelegramNotifier, createStorage, createLlm } from '@feed-digest/adapters';
 import { buildNotificationData } from '@feed-digest/pipeline';
+import { LlmProvider } from '@feed-digest/core';
 
 dotenv.config();
 
@@ -60,7 +61,7 @@ async function sendRecoveryNotification(
     articlesProcessed: articles.length,
     articlesRemaining: 0,
     tagCounts,
-    llmProvider: llmProvider as 'claude' | 'gemini',
+    llmProvider: llmProvider as LlmProvider,
     summaryLanguage: summaryLang,
   });
 
