@@ -7,6 +7,8 @@ import { formatDate, formatScore } from '../../shared/format';
 
 type TagState = 'auto' | 'filtered' | 'default';
 type FilterTab = 'all' | TagState;
+type SortColumn = 'name' | 'score' | 'selectionCount' | 'presentedCount' | 'state';
+type SortDir = 'asc' | 'desc';
 
 interface TagRow {
   name: string;
@@ -39,7 +41,11 @@ export class TagPreferencesComponent {
       }
     });
 
-    this.loadPreferences();
+    effect(() => {
+      if (this.auth.chatId().trim() && !this.data() && !this.loading()) {
+        this.loadPreferences();
+      }
+    });
   }
 
   loading = signal(false);
@@ -47,6 +53,8 @@ export class TagPreferencesComponent {
   data = signal<TagPreferenceResponse | null>(null);
   activeFilter = signal<FilterTab>('all');
   searchQuery = signal('');
+  sortColumn = signal<SortColumn>('score');
+  sortDir = signal<SortDir>('desc');
 
   threshold = computed(() => this.data()?.threshold ?? 0.6);
   minRuns = computed(() => this.data()?.minRuns ?? 3);
@@ -78,16 +86,25 @@ export class TagPreferencesComponent {
           lastSelectedAt: stats.lastSelectedAt,
         };
       })
-      .sort((a, b) => b.score - a.score);
   });
 
   tags = computed(() => {
     const filter = this.activeFilter();
     const query = this.searchQuery().toLowerCase().trim();
+    const col = this.sortColumn();
+    const dir = this.sortDir();
     let result = this.allTags();
     if (filter !== 'all') result = result.filter(t => t.state === filter);
     if (query) result = result.filter(t => t.name.toLowerCase().includes(query));
-    return result;
+    return [...result].sort((a, b) => {
+      let cmp = 0;
+      if (col === 'name') cmp = a.name.localeCompare(b.name);
+      else if (col === 'score') cmp = a.score - b.score;
+      else if (col === 'selectionCount') cmp = a.selectionCount - b.selectionCount;
+      else if (col === 'presentedCount') cmp = a.presentedCount - b.presentedCount;
+      else if (col === 'state') cmp = a.state.localeCompare(b.state);
+      return dir === 'asc' ? cmp : -cmp;
+    });
   });
 
   autoCount = computed(() => this.allTags().filter(t => t.state === 'auto').length);
@@ -102,6 +119,15 @@ export class TagPreferencesComponent {
 
   setFilter(tab: FilterTab): void {
     this.activeFilter.set(tab);
+  }
+
+  toggleSort(col: SortColumn): void {
+    if (this.sortColumn() === col) {
+      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortColumn.set(col);
+      this.sortDir.set(col === 'name' || col === 'state' ? 'asc' : 'desc');
+    }
   }
 
   loadPreferences(): void {

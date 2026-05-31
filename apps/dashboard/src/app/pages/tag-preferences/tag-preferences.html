@@ -1,12 +1,6 @@
 <div class="container">
   <h1>Tag Preferences</h1>
 
-  <div class="page-actions">
-    <button class="btn btn-primary" (click)="loadPreferences()" [disabled]="loading()">
-      {{ loading() ? 'Loading...' : 'Load Preferences' }}
-    </button>
-  </div>
-
   @if (!auth.chatId()) {
     <div class="alert alert-info">
       Un <strong>Chat ID</strong> Telegram est requis pour charger les préférences.
@@ -97,11 +91,21 @@
       <table>
         <thead>
           <tr>
-            <th>Tag</th>
-            <th>Score</th>
-            <th>Selected</th>
-            <th>Presented</th>
-            <th>State</th>
+            <th class="sortable" (click)="toggleSort('name')">
+              Tag <span class="sort-indicator">{{ sortColumn() === 'name' ? (sortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span>
+            </th>
+            <th class="sortable" (click)="toggleSort('score')">
+              Score <span class="sort-indicator">{{ sortColumn() === 'score' ? (sortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span>
+            </th>
+            <th class="sortable center" (click)="toggleSort('selectionCount')">
+              Selected <span class="sort-indicator">{{ sortColumn() === 'selectionCount' ? (sortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span>
+            </th>
+            <th class="sortable center" (click)="toggleSort('presentedCount')">
+              Presented <span class="sort-indicator">{{ sortColumn() === 'presentedCount' ? (sortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span>
+            </th>
+            <th class="sortable center" (click)="toggleSort('state')">
+              State <span class="sort-indicator">{{ sortColumn() === 'state' ? (sortDir() === 'asc' ? '▲' : '▼') : '⇅' }}</span>
+            </th>
             <th>Last Selected</th>
           </tr>
         </thead>
