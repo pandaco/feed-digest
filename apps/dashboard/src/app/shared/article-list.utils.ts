@@ -42,7 +42,7 @@ export function applyStructuralFilters(articles: Article[], filters: StructuralF
   }
 
   if (filters.tags.size > 0) {
-    result = result.filter(a => a.tags.some(t => filters.tags.has(t)));
+    result = result.filter(a => [...filters.tags].every(t => a.tags.includes(t)));
   }
 
   return result;

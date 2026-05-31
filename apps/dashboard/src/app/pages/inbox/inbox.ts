@@ -147,7 +147,29 @@ export class InboxComponent {
   lowCount = computed(() => this.articles().filter(a => a.importance === 'low').length);
   untaggedCount = computed(() => this.articles().filter(a => !a.tags || a.tags.length === 0).length);
 
-  sourceCountsList = computed(() => countByField(this.articles(), a => a.feedSource));
+  // For cross-filtering: each histogram reflects all active filters except its own,
+  // so counts stay meaningful as the user narrows the scope.
+  private filteredForTagCounts = computed(() =>
+    applyStructuralFilters(this.articles(), {
+      importance: this.importanceFilter(),
+      sources: this.selectedSources(),
+      scraperSource: this.scraperSourceFilter(),
+      tags: new Set<string>(),
+      timeRange: this.timeFilter(),
+    })
+  );
+
+  private filteredForSourceCounts = computed(() =>
+    applyStructuralFilters(this.articles(), {
+      importance: this.importanceFilter(),
+      sources: new Set<string>(),
+      scraperSource: this.scraperSourceFilter(),
+      tags: this.selectedTags(),
+      timeRange: this.timeFilter(),
+    })
+  );
+
+  sourceCountsList = computed(() => countByField(this.filteredForSourceCounts(), a => a.feedSource));
 
   uniqueScraperSources = computed(() =>
     [...new Set(this.articles().map(a => a.scraperSource).filter(Boolean))].sort()
@@ -157,7 +179,7 @@ export class InboxComponent {
     this.scraperSourceFilter() !== 'all' || this.selectedTags().size > 0
   );
 
-  tagCounts = computed(() => countTags(this.articles()));
+  tagCounts = computed(() => countTags(this.filteredForTagCounts()));
 
   visibleTags = computed(() => {
     const all = this.tagCounts();
