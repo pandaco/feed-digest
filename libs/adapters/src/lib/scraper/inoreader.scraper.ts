@@ -72,7 +72,7 @@ export class InoreaderScraper implements ScraperPort {
 
     await Promise.all([
       page.waitForURL((url) => !url.href.includes('login'), { timeout: 60000 }),
-      page.click('button:has-text("Sign in")')
+      page.click('button[type="submit"]:has-text("Sign in")')
     ]);
 
     console.log('[InoreaderScraper] Authentication successful.');
