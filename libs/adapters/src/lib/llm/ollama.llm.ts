@@ -28,12 +28,14 @@ export class OllamaLlm implements LlmPort {
   private readonly baseUrl: string;
   private readonly model: string;
   private readonly numPredict: number;
+  private readonly numCtx: number;
   private usage: LlmUsage = { calls: 0, inputTokens: 0, outputTokens: 0 };
 
   constructor(
     baseUrl = 'http://localhost:11434',
     model = 'llama3.1:8b',
     numPredict?: number,
+    numCtx?: number,
   ) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.model = model;
@@ -41,6 +43,11 @@ export class OllamaLlm implements LlmPort {
     // model normally stops at the closing `}` (~100–150 tokens), so this
     // mostly catches the rare cases where it would otherwise ramble.
     this.numPredict = numPredict ?? 512;
+    // Context window. Most models default to 131k tokens which forces
+    // Ollama to reserve a lot of VRAM for nothing — our typical prompt
+    // is ~1500 tokens. Capping at 4k keeps headroom for the truncated
+    // article + system prompt + output, and frees memory bandwidth.
+    this.numCtx = numCtx ?? 4096;
   }
 
   getUsage(): LlmUsage {
@@ -72,7 +79,7 @@ export class OllamaLlm implements LlmPort {
           { role: 'user', content: userPrompt },
         ],
         format: ENRICH_SCHEMA,
-        options: { temperature: 0.1, num_predict: this.numPredict },
+        options: { temperature: 0.1, num_predict: this.numPredict, num_ctx: this.numCtx },
       });
       return this.parseResponse(response.message.content, input.title);
     } catch (error) {
@@ -93,7 +100,7 @@ export class OllamaLlm implements LlmPort {
     try {
       const response = await this.chat({
         messages: [{ role: 'user', content: userPrompt }],
-        options: { temperature: 0.3, num_predict: this.numPredict },
+        options: { temperature: 0.3, num_predict: this.numPredict, num_ctx: this.numCtx },
       });
       return response.message.content.trim();
     } catch (error) {
@@ -126,7 +133,7 @@ ${items}`;
     try {
       const response = await this.chat({
         messages: [{ role: 'user', content: userPrompt }],
-        options: { temperature: 0.3, num_predict: this.numPredict },
+        options: { temperature: 0.3, num_predict: this.numPredict, num_ctx: this.numCtx },
       });
       return cleanHtml(response.message.content);
     } catch (error) {
