@@ -123,6 +123,24 @@ Mirrors the AWS deployment. Useful for testing storage code paths.
 > settings panel (gear icon). If `TELEGRAM_SECRET_TOKEN` is empty in
 > `.env`, the API accepts all requests — convenient for local dev.
 
+### Faster local runs
+
+`npm run scraper` prints per-article timings (`fetch / enrich / store`,
+in ms) followed by a perf summary table (avg / p50 / p95 / max,
+parallelism factor, throughput) so you can see exactly where the time
+goes. A few knobs that pay off:
+
+- **`SKIP_MARK_AS_READ=true`** — keep articles unread/starred on
+  Inoreader so you can iterate on the same batch repeatedly.
+- **`LLM_PROVIDER=ollama`** — the jitter between LLM calls
+  (`PIPELINE_{MIN,MAX}_DELAY_MS`) is **automatically bypassed**; that
+  delay only exists to spare cloud-API quotas.
+- **Smaller Ollama model** — `llama3.1:8b` is ~15-25 s/article on Apple
+  silicon. Swapping `OLLAMA_MODEL` for a 3B model (`llama3.2:3b`,
+  `qwen2.5:3b`) cuts enrich time by 2-3×.
+- **`ARTICLES_LIMIT=20`** — for everyday iteration, no need to refetch
+  the whole inbox.
+
 ---
 
 ## 4. Architecture

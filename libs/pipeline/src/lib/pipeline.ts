@@ -85,6 +85,18 @@ interface TagPreferenceContext {
   minRuns: number;
 }
 
+interface ArticleTimings {
+  fetchMs: number;
+  enrichMs: number;
+  storeMs: number;
+  jitterMs: number;
+}
+
+interface EnrichResult {
+  article: Article;
+  timings: ArticleTimings;
+}
+
 async function enrichAndSave(
   meta: import('@feed-digest/core').ArticleMetadata,
   index: number,
@@ -95,19 +107,27 @@ async function enrichAndSave(
   minDelayMs: number,
   maxDelayMs: number,
   prefContext: TagPreferenceContext,
-): Promise<Article | undefined> {
+): Promise<EnrichResult | undefined> {
   const tag = `[${index + 1}/${total}]`;
-  const jitter = Math.floor(Math.random() * (maxDelayMs - minDelayMs + 1)) + minDelayMs;
+  // Ollama runs locally with no rate limit, so skip the anti-throttling jitter.
+  const jitterMs = options.llmProvider === 'ollama'
+    ? 0
+    : Math.floor(Math.random() * (maxDelayMs - minDelayMs + 1)) + minDelayMs;
 
-  await new Promise(resolve => setTimeout(resolve, jitter));
-  console.log(`[Pipeline] ${tag} Fetching content: ${meta.title} (delay: ${jitter}ms)`);
+  if (jitterMs > 0) {
+    await new Promise(resolve => setTimeout(resolve, jitterMs));
+  }
+  console.log(`[Pipeline] ${tag} Fetching content: ${meta.title}${jitterMs > 0 ? ` (delay: ${jitterMs}ms)` : ''}`);
 
+  const fetchStart = Date.now();
   const fetched = await options.scraper.fetchContent(meta.url);
+  const fetchMs = Date.now() - fetchStart;
   const fullContent = fetched.content;
   const contentUnavailable = !fullContent;
   const publishedAt = fetched.publishedAt || meta.publishedAt;
 
   console.log(`[Pipeline] ${tag} Enriching via ${options.llmProvider}...`);
+  const enrichStart = Date.now();
   const userInterests = process.env['USER_INTERESTS'] || '';
   const enrichment = await options.llm.enrich({
     title: meta.title,
@@ -117,6 +137,7 @@ async function enrichAndSave(
     maxTags: options.maxTags ?? 3,
     userInterests: userInterests || undefined,
   });
+  const enrichMs = Date.now() - enrichStart;
 
   const importance = computeImportance(
     enrichment.tags,
@@ -140,12 +161,17 @@ async function enrichAndSave(
     relevanceScore: enrichment.relevanceScore,
   };
 
-  console.log(`[Pipeline] ${tag} Importance: ${importance} | Stored in Inbox: ${article.title}`);
+  const storeStart = Date.now();
+  await Promise.all([
+    options.storage.appendToAll([article]),
+    options.storage.appendToInbox([article]),
+  ]);
+  const storeMs = Date.now() - storeStart;
 
-  await options.storage.appendToAll([article]);
-  await options.storage.appendToInbox([article]);
+  const totalMs = fetchMs + enrichMs + storeMs;
+  console.log(`[Pipeline] ${tag} ${importance.toUpperCase()} | ${totalMs}ms (fetch ${fetchMs} / enrich ${enrichMs} / store ${storeMs}) | ${article.title}`);
 
-  return article;
+  return { article, timings: { fetchMs, enrichMs, storeMs, jitterMs } };
 }
 
 export interface BuildNotificationDataOptions {
@@ -233,6 +259,56 @@ async function sendNotifications(
   });
 }
 
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const idx = Math.min(sorted.length - 1, Math.floor(p * sorted.length));
+  return sorted[idx];
+}
+
+function logPerformanceSummary(
+  successful: EnrichResult[],
+  enrichTotalMs: number,
+  markTotalMs: number,
+  concurrency: number,
+  llmProvider: LlmProvider,
+): void {
+  if (successful.length === 0) {
+    console.log('[Pipeline] No articles processed — skipping perf summary.');
+    return;
+  }
+
+  const fetchTimes = successful.map(r => r.timings.fetchMs).sort((a, b) => a - b);
+  const enrichTimes = successful.map(r => r.timings.enrichMs).sort((a, b) => a - b);
+  const storeTimes = successful.map(r => r.timings.storeMs).sort((a, b) => a - b);
+  const totalTimes = successful
+    .map(r => r.timings.fetchMs + r.timings.enrichMs + r.timings.storeMs + r.timings.jitterMs)
+    .sort((a, b) => a - b);
+
+  const sum = (arr: number[]) => arr.reduce((s, v) => s + v, 0);
+  const mean = (arr: number[]) => Math.round(sum(arr) / arr.length);
+  const fmtMs = (ms: number) => `${ms.toLocaleString()}ms`;
+  const fmtSec = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+
+  const totalWallMs = enrichTotalMs + markTotalMs;
+  const cumulativeWorkMs = sum(totalTimes);
+  const parallelismRatio = (cumulativeWorkMs / enrichTotalMs).toFixed(2);
+
+  console.log('');
+  console.log('[Pipeline] ┌─ Performance summary ────────────────────────────────');
+  console.log(`[Pipeline] │ Articles processed : ${successful.length}`);
+  console.log(`[Pipeline] │ Wall clock         : ${fmtSec(totalWallMs)} (enrich ${fmtSec(enrichTotalMs)} + markAsRead ${fmtSec(markTotalMs)})`);
+  console.log(`[Pipeline] │ LLM provider       : ${llmProvider}  (concurrency=${concurrency})`);
+  console.log(`[Pipeline] │ Throughput         : ${(successful.length / (totalWallMs / 1000)).toFixed(2)} art/s  (≈ ${fmtMs(Math.round(totalWallMs / successful.length))} per article wall time)`);
+  console.log(`[Pipeline] │ Parallelism factor : ${parallelismRatio}× (cumulative work ${fmtSec(cumulativeWorkMs)} vs wall ${fmtSec(enrichTotalMs)})`);
+  console.log('[Pipeline] │');
+  console.log('[Pipeline] │ Per-article timings  avg     p50     p95     max');
+  console.log(`[Pipeline] │   fetch content     ${fmtMs(mean(fetchTimes)).padStart(7)} ${fmtMs(percentile(fetchTimes, 0.5)).padStart(7)} ${fmtMs(percentile(fetchTimes, 0.95)).padStart(7)} ${fmtMs(fetchTimes[fetchTimes.length - 1]).padStart(7)}`);
+  console.log(`[Pipeline] │   enrich (LLM)      ${fmtMs(mean(enrichTimes)).padStart(7)} ${fmtMs(percentile(enrichTimes, 0.5)).padStart(7)} ${fmtMs(percentile(enrichTimes, 0.95)).padStart(7)} ${fmtMs(enrichTimes[enrichTimes.length - 1]).padStart(7)}`);
+  console.log(`[Pipeline] │   storage writes    ${fmtMs(mean(storeTimes)).padStart(7)} ${fmtMs(percentile(storeTimes, 0.5)).padStart(7)} ${fmtMs(percentile(storeTimes, 0.95)).padStart(7)} ${fmtMs(storeTimes[storeTimes.length - 1]).padStart(7)}`);
+  console.log('[Pipeline] └──────────────────────────────────────────────────────');
+  console.log('');
+}
+
 /**
  * Main orchestration function for the InoReader digest pipeline.
  * Coordinates scraping, AI enrichment, storage, and notification.
@@ -283,28 +359,50 @@ export async function runPipeline(options: RunPipelineOptions): Promise<void> {
     }
 
     const limitEnrich = pLimit(concurrency);
+    // markAsRead operates on a single shared Inoreader page, so it stays
+    // serialized inside the scraper. We fire-and-forget here so the enrich
+    // loop is not blocked waiting for mark-as-read between articles.
     const limitMarkRead = pLimit(1);
+    const skipMarkAsRead = process.env['SKIP_MARK_AS_READ'] === 'true';
+    if (skipMarkAsRead) {
+      console.log('[Pipeline] SKIP_MARK_AS_READ=true → articles will stay unread/starred on Inoreader.');
+    }
+    const markPromises: Promise<void>[] = [];
 
+    const enrichStart = Date.now();
     const results = await Promise.all(metadata.map((meta, i) => limitEnrich(async () => {
       const tag = `[${i + 1}/${metadata.length}]`;
       try {
-        const article = await enrichAndSave(meta, i, metadata.length, options, languageName, runAt, minDelayMs, maxDelayMs, prefContext);
-        if (article) {
-          await limitMarkRead(async () => {
-            console.log(`[Pipeline] ${tag} Marking as read...`);
-            await options.scraper.markAsRead(article.id, article.url);
-          });
+        const result = await enrichAndSave(meta, i, metadata.length, options, languageName, runAt, minDelayMs, maxDelayMs, prefContext);
+        if (result && !skipMarkAsRead) {
+          markPromises.push(limitMarkRead(async () => {
+            console.log(`[Pipeline] ${tag} Marking as read (async)...`);
+            await options.scraper.markAsRead(result.article.id, result.article.url);
+          }));
         }
-        return article;
+        return result;
       } catch (error) {
         console.error(`[Pipeline] ${tag} Failed to process "${meta.title}":`, error);
         return undefined;
       }
     })));
+    const enrichTotalMs = Date.now() - enrichStart;
 
-    const enrichedArticles = results.filter((a): a is Article => a !== undefined);
+    const successful = results.filter((r): r is EnrichResult => r !== undefined);
+    const enrichedArticles = successful.map(r => r.article);
     const failedCount = metadata.length - enrichedArticles.length;
-    console.log(`[Pipeline] Finished processing. (Saved: ${enrichedArticles.length}, Failed: ${failedCount})`);
+    console.log(`[Pipeline] Finished enrich phase in ${enrichTotalMs}ms (Saved: ${enrichedArticles.length}, Failed: ${failedCount}).`);
+
+    let markTotalMs = 0;
+    if (markPromises.length > 0) {
+      console.log(`[Pipeline] Waiting for ${markPromises.length} background mark-as-read to finish...`);
+      const markStart = Date.now();
+      await Promise.all(markPromises);
+      markTotalMs = Date.now() - markStart;
+      console.log(`[Pipeline] Mark-as-read drained in ${markTotalMs}ms.`);
+    }
+
+    logPerformanceSummary(successful, enrichTotalMs, markTotalMs, concurrency, options.llmProvider);
 
     // Automatic purge of expired articles in ALL collection
     const retentionDays = parseInt(process.env['RETENTION_DAYS_ALL'] || '30', 10);
