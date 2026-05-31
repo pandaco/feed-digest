@@ -1,12 +1,6 @@
 <div class="container">
   <h1>Saved Articles</h1>
 
-  <div class="page-actions">
-    <button class="btn btn-primary" (click)="loadSaved()" [disabled]="loading()">
-      {{ loading() ? 'Loading...' : 'Load Saved' }}
-    </button>
-  </div>
-
   @if (error()) {
     <div class="alert alert-error" role="alert">{{ error() }}</div>
   }

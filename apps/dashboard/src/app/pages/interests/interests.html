@@ -5,12 +5,6 @@
     each article's relevance (1-10) during enrichment. Keep it concise (~200 words max).
   </p>
 
-  <div class="page-actions">
-    <button class="btn btn-primary" (click)="loadInterests()" [disabled]="loading()">
-      {{ loading() ? 'Loading...' : 'Load' }}
-    </button>
-  </div>
-
   @if (error()) {
     <div class="alert alert-error" role="alert">{{ error() }}</div>
   }

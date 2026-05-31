@@ -1,12 +1,6 @@
 <div class="container">
   <h1>Snoozed Articles</h1>
 
-  <div class="page-actions">
-    <button class="btn btn-primary" (click)="loadSnoozed()" [disabled]="loading()">
-      {{ loading() ? 'Loading...' : 'Load Snoozed' }}
-    </button>
-  </div>
-
   @if (error()) {
     <div class="alert alert-error" role="alert">{{ error() }}</div>
   }
