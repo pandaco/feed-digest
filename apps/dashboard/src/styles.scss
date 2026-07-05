@@ -421,6 +421,35 @@ h2 {
   to { opacity: 1; max-height: 200px; }
 }
 
+// Inline spinner for pending actions
+.inline-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--primary-soft);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: -2px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+// Bulk bar: count label and divider between selection controls and actions
+.bulk-count {
+  white-space: nowrap;
+  margin-right: 0.25rem;
+}
+
+.bulk-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border-strong, var(--border));
+  margin: 0 0.5rem;
+}
+
 // Source filter chips
 .source-filter-row {
   animation: slideDown 0.2s ease-out;
@@ -554,6 +583,30 @@ tbody td {
   background: var(--danger-border);
   color: var(--danger-text);
   border: 1px solid var(--danger-muted);
+}
+
+// Tag badge rendered as a <button> that toggles the tag filter
+.badge-clickable {
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+
+  &:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+}
+
+.badge-tag-selected {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+
+  &:hover {
+    color: #fff;
+    opacity: 0.85;
+  }
 }
 
 .badge-high {

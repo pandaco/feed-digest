@@ -190,8 +190,15 @@
 
       <!-- Bulk action bar -->
       @if (selectedCount() > 0) {
-        <div class="bulk-bar">
-          <span>{{ selectedCount() }} selected</span>
+        <div class="bulk-bar" role="status">
+          <span class="bulk-count">{{ selectedCount() }} of {{ filteredArticles().length }} selected</span>
+          @if (selectedCount() < filteredArticles().length) {
+            <button class="btn btn-outline btn-sm" (click)="selectAllFiltered()">
+              Select all {{ filteredArticles().length }}
+            </button>
+          }
+          <button class="btn btn-outline btn-sm" (click)="clearSelection()">Clear</button>
+          <span class="bulk-divider" aria-hidden="true"></span>
           <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="deleting()">
             {{ deleting() ? 'Removing...' : 'Remove selected' }}
           </button>
@@ -209,8 +216,10 @@
               <input
                 type="checkbox"
                 [checked]="allVisibleSelected()"
+                [indeterminate]="someVisibleSelected() && !allVisibleSelected()"
                 (change)="toggleSelectAll()"
-                title="Select all visible"
+                title="Select all articles on this page"
+                aria-label="Select all articles on this page"
               />
             </th>
             <th class="col-expand"></th>
@@ -249,7 +258,12 @@
               </td>
               <td class="article-tags">
                 @for (tag of article.tags; track tag) {
-                  <span class="badge badge-tag">{{ tag }}</span>
+                  <button
+                    class="badge badge-tag badge-clickable"
+                    [class.badge-tag-selected]="isTagSelected(tag)"
+                    (click)="toggleTag(tag)"
+                    [title]="isTagSelected(tag) ? 'Remove tag from filter' : 'Filter by this tag'"
+                  >{{ tag }}</button>
                 }
               </td>
               <td class="col-actions">

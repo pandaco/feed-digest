@@ -585,18 +585,16 @@ kbd {
 .bulk-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.6rem 1.25rem;
   background: var(--bg-surface-alt);
   border-bottom: 1px solid var(--border);
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--text-primary);
-}
-
-.bulk-actions {
-  display: flex;
-  gap: 0.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .result-count {

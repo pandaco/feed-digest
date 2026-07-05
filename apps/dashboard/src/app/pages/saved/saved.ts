@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { SavedService } from '../../services/saved.service';
 import { Article } from '../../services/inbox.service';
+import { ToastService } from '../../services/toast.service';
+import { runChunked } from '../../shared/bulk-actions';
 import { formatDate } from '../../shared/format';
 import {
   ImportanceFilter, SortField, SortDirection, COLLAPSED_TAG_LIMIT, PAGE_SIZE,
@@ -18,6 +20,7 @@ import {
 })
 export class SavedComponent {
   private service = inject(SavedService);
+  private toast = inject(ToastService);
   private destroyRef = inject(DestroyRef);
   private errorTimer?: ReturnType<typeof setTimeout>;
 
@@ -139,6 +142,28 @@ export class SavedComponent {
     return visible.every(a => sel.has(a.id));
   });
 
+  someVisibleSelected = computed(() => {
+    const sel = this.selectedIds();
+    return this.paginatedArticles().some(a => sel.has(a.id));
+  });
+
+  hasAnyActiveFilter = computed(() =>
+    this.importanceFilter() !== 'all' ||
+    this.selectedSources().size > 0 ||
+    this.scraperSourceFilter() !== 'all' ||
+    this.selectedTags().size > 0 ||
+    this.searchQuery().trim() !== ''
+  );
+
+  resetAllFilters(): void {
+    this.importanceFilter.set('all');
+    this.selectedSources.set(new Set());
+    this.scraperSourceFilter.set('all');
+    this.selectedTags.set(new Set());
+    this.searchQuery.set('');
+    this.selectedIds.set(new Set());
+  }
+
   // Source filter
   isSourceSelected(source: string): boolean {
     return this.selectedSources().has(source);
@@ -209,31 +234,56 @@ export class SavedComponent {
     }
   }
 
-  bulkDelete(): void {
+  selectAllFiltered(): void {
+    this.selectedIds.set(new Set(this.filteredArticles().map(a => a.id)));
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  // After deletes empty the filtered view, stale filters would leave the
+  // user staring at an empty list — clear them so remaining articles show up.
+  private clearFiltersIfViewEmpty(): void {
+    if (this.filteredArticles().length === 0 && this.articles().length > 0 && this.hasAnyActiveFilter()) {
+      this.resetAllFilters();
+      this.toast.success('No articles matched the filters anymore — filters cleared');
+    }
+  }
+
+  async bulkDelete(): Promise<void> {
     const ids = [...this.selectedIds()];
-    if (ids.length === 0) return;
+    if (ids.length === 0 || this.deleting()) return;
+    if (ids.length > PAGE_SIZE && !confirm(`Remove ${ids.length} articles? This cannot be undone.`)) return;
 
     this.deleting.set(true);
-    this.error.set(null);
     this.deletingIds.set(new Set(ids));
 
-    this.service.bulkDelete(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        const deletedSet = new Set(ids);
-        this.articles.update(list => list.filter(a => !deletedSet.has(a.id)));
-        this.selectedIds.set(new Set());
-        this.deletingIds.set(new Set());
-        if (this.expandedId() && deletedSet.has(this.expandedId()!)) {
-          this.expandedId.set(null);
-        }
-        this.deleting.set(false);
-      },
-      error: () => {
-        this.error.set('Failed to remove articles');
-        this.deletingIds.set(new Set());
-        this.deleting.set(false);
+    const toast = this.toast.progress(`Removing ${ids.length} articles…`);
+    toast.update(0, ids.length);
+
+    const result = await runChunked(ids, chunk => this.service.bulkDelete(chunk), {
+      onChunkDone: (chunk, processed) => {
+        const chunkSet = new Set(chunk);
+        this.articles.update(list => list.filter(a => !chunkSet.has(a.id)));
+        toast.update(processed, ids.length);
       },
     });
+
+    this.selectedIds.set(new Set());
+    this.deletingIds.set(new Set());
+    const expanded = this.expandedId();
+    if (expanded && !this.articles().some(a => a.id === expanded)) {
+      this.expandedId.set(null);
+    }
+    this.deleting.set(false);
+
+    if (result.failed === 0) {
+      toast.success(`${result.done} article${result.done > 1 ? 's' : ''} removed`);
+    } else {
+      toast.error(`${result.done} removed, ${result.failed} failed`);
+    }
+    this.clearFiltersIfViewEmpty();
   }
 
   loadSaved(): void {
@@ -264,10 +314,11 @@ export class SavedComponent {
         this.selectedIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
         this.deletingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
         if (this.expandedId() === article.id) this.expandedId.set(null);
+        this.clearFiltersIfViewEmpty();
       },
       error: () => {
         this.deletingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-        this.error.set(`Failed to remove "${article.title}"`);
+        this.toast.error(`Failed to remove "${article.title}"`);
       },
     });
   }

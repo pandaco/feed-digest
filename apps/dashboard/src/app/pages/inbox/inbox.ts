@@ -7,6 +7,8 @@ import { InboxService, Article, RetagProgress } from '../../services/inbox.servi
 import { TagPreferenceService } from '../../services/tag-preference.service';
 import { AuthService } from '../../services/auth.service';
 import { ClusterConfigService, ClusterConfig } from '../../services/cluster-config.service';
+import { ToastService } from '../../services/toast.service';
+import { runChunked } from '../../shared/bulk-actions';
 import { formatDate } from '../../shared/format';
 import { getSnoozePresets, SnoozePreset } from '../../shared/snooze.utils';
 import { clusterArticles, getUnclusteredArticles, Cluster } from '../../shared/clustering.utils';
@@ -34,6 +36,7 @@ export class InboxComponent {
   private prefService = inject(TagPreferenceService);
   private auth = inject(AuthService);
   protected configService = inject(ClusterConfigService);
+  private toast = inject(ToastService);
   private sanitizer = inject(DomSanitizer);
   private destroyRef = inject(DestroyRef);
   private errorTimer?: ReturnType<typeof setTimeout>;
@@ -314,6 +317,11 @@ export class InboxComponent {
     return visible.every(a => sel.has(a.id));
   });
 
+  someVisibleSelected = computed(() => {
+    const sel = this.selectedIds();
+    return this.paginatedArticles().some(a => sel.has(a.id));
+  });
+
   tagBadgeClass(tag: string): string {
     const state = this.tagStates()[tag];
     if (state === 'auto') return 'badge badge-tag-auto';
@@ -422,31 +430,63 @@ export class InboxComponent {
     }
   }
 
-  bulkDelete(): void {
+  selectAllFiltered(): void {
+    this.selectedIds.set(new Set(this.filteredArticles().map(a => a.id)));
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  // After deletes/saves empty the filtered view, stale filters would leave the
+  // user staring at an empty list — clear them so remaining articles show up.
+  private clearFiltersIfViewEmpty(): void {
+    if (this.filteredArticles().length === 0 && this.articles().length > 0 && this.hasAnyActiveFilter()) {
+      this.resetAllFilters();
+      this.toast.success('No articles matched the filters anymore — filters cleared');
+    }
+  }
+
+  async bulkDelete(): Promise<void> {
     const ids = [...this.selectedIds()];
-    if (ids.length === 0) return;
+    if (ids.length === 0 || this.deleting()) return;
+    // A selection larger than one page is a cleanup, not a content judgement:
+    // guard it with a confirm and skip the tag-preference negative feedback.
+    const massDelete = ids.length > PAGE_SIZE;
+    if (massDelete && !confirm(`Delete ${ids.length} articles? This cannot be undone.`)) return;
 
     this.deleting.set(true);
-    this.error.set(null);
     this.deletingIds.set(new Set(ids));
 
-    this.service.bulkDelete(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        const deletedSet = new Set(ids);
-        this.articles.update(list => list.filter(a => !deletedSet.has(a.id)));
-        this.selectedIds.set(new Set());
-        this.deletingIds.set(new Set());
-        if (this.expandedId() && deletedSet.has(this.expandedId()!)) {
-          this.expandedId.set(null);
-        }
-        this.deleting.set(false);
+    const toast = this.toast.progress(`Deleting ${ids.length} articles…`);
+    toast.update(0, ids.length);
+
+    const result = await runChunked(
+      ids,
+      chunk => this.service.bulkDelete(chunk, { skipTagFeedback: massDelete }),
+      {
+        onChunkDone: (chunk, processed) => {
+          const chunkSet = new Set(chunk);
+          this.articles.update(list => list.filter(a => !chunkSet.has(a.id)));
+          toast.update(processed, ids.length);
+        },
       },
-      error: () => {
-        this.error.set('Failed to delete articles');
-        this.deletingIds.set(new Set());
-        this.deleting.set(false);
-      },
-    });
+    );
+
+    this.selectedIds.set(new Set());
+    this.deletingIds.set(new Set());
+    const expanded = this.expandedId();
+    if (expanded && !this.articles().some(a => a.id === expanded)) {
+      this.expandedId.set(null);
+    }
+    this.deleting.set(false);
+
+    if (result.failed === 0) {
+      toast.success(`${result.done} article${result.done > 1 ? 's' : ''} deleted`);
+    } else {
+      toast.error(`${result.done} deleted, ${result.failed} failed`);
+    }
+    this.clearFiltersIfViewEmpty();
   }
 
   saveArticle(article: Article): void {
@@ -460,39 +500,47 @@ export class InboxComponent {
         this.selectedIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
         this.savingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
         if (this.expandedId() === article.id) this.expandedId.set(null);
+        this.clearFiltersIfViewEmpty();
       },
       error: () => {
         this.savingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-        this.error.set(`Failed to save "${article.title}"`);
+        this.toast.error(`Failed to save "${article.title}"`);
       },
     });
   }
 
-  bulkSave(): void {
+  async bulkSave(): Promise<void> {
     const ids = [...this.selectedIds()];
-    if (ids.length === 0) return;
+    if (ids.length === 0 || this.saving()) return;
 
     this.saving.set(true);
-    this.error.set(null);
     this.savingIds.set(new Set(ids));
 
-    this.service.saveArticles(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        const savedSet = new Set(ids);
-        this.articles.update(list => list.filter(a => !savedSet.has(a.id)));
-        this.selectedIds.set(new Set());
-        this.savingIds.set(new Set());
-        if (this.expandedId() && savedSet.has(this.expandedId()!)) {
-          this.expandedId.set(null);
-        }
-        this.saving.set(false);
-      },
-      error: () => {
-        this.error.set('Failed to save articles');
-        this.savingIds.set(new Set());
-        this.saving.set(false);
+    const toast = this.toast.progress(`Saving ${ids.length} articles…`);
+    toast.update(0, ids.length);
+
+    const result = await runChunked(ids, chunk => this.service.saveArticles(chunk), {
+      onChunkDone: (chunk, processed) => {
+        const chunkSet = new Set(chunk);
+        this.articles.update(list => list.filter(a => !chunkSet.has(a.id)));
+        toast.update(processed, ids.length);
       },
     });
+
+    this.selectedIds.set(new Set());
+    this.savingIds.set(new Set());
+    const expanded = this.expandedId();
+    if (expanded && !this.articles().some(a => a.id === expanded)) {
+      this.expandedId.set(null);
+    }
+    this.saving.set(false);
+
+    if (result.failed === 0) {
+      toast.success(`${result.done} article${result.done > 1 ? 's' : ''} saved`);
+    } else {
+      toast.error(`${result.done} saved, ${result.failed} failed`);
+    }
+    this.clearFiltersIfViewEmpty();
   }
 
   loadInbox(): void {
@@ -540,7 +588,6 @@ export class InboxComponent {
 
   generateSummary(period?: string): void {
     this.summaryLoading.set(true);
-    this.error.set(null);
 
     this.service.generateSummary(period).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res) => {
@@ -548,7 +595,7 @@ export class InboxComponent {
         this.summaryLoading.set(false);
       },
       error: () => {
-        this.error.set('Failed to generate summary');
+        this.toast.error('Failed to generate summary');
         this.summaryLoading.set(false);
       },
     });
@@ -559,7 +606,6 @@ export class InboxComponent {
     if (ids.length === 0) return;
 
     this.summaryLoading.set(true);
-    this.error.set(null);
 
     this.service.synthesize(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (res) => {
@@ -567,7 +613,7 @@ export class InboxComponent {
         this.summaryLoading.set(false);
       },
       error: () => {
-        this.error.set('Failed to generate summary');
+        this.toast.error('Failed to generate summary');
         this.summaryLoading.set(false);
       },
     });
@@ -575,7 +621,6 @@ export class InboxComponent {
 
   retagUntagged(): void {
     if (this.retagProgress()) return;
-    this.error.set(null);
 
     this.service.retagUntaggedStream().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (event: RetagProgress) => {
@@ -591,12 +636,12 @@ export class InboxComponent {
           this.retagProgress.set(null);
           this.loadInbox();
         } else if (event.type === 'error') {
-          this.error.set('Erreur lors du taguage des articles');
+          this.toast.error('Erreur lors du taguage des articles');
           this.retagProgress.set(null);
         }
       },
       error: () => {
-        this.error.set('Erreur lors du taguage des articles');
+        this.toast.error('Erreur lors du taguage des articles');
         this.retagProgress.set(null);
       },
     });
@@ -613,10 +658,11 @@ export class InboxComponent {
         this.selectedIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
         this.deletingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
         if (this.expandedId() === article.id) this.expandedId.set(null);
+        this.clearFiltersIfViewEmpty();
       },
       error: () => {
         this.deletingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-        this.error.set(`Failed to delete "${article.title}"`);
+        this.toast.error(`Failed to delete "${article.title}"`);
       },
     });
   }
@@ -751,20 +797,7 @@ export class InboxComponent {
     if (action === 'save') {
       this.saveArticle(article);
     } else {
-      if (this.deletingIds().has(article.id)) return;
-      this.deletingIds.update(set => new Set(set).add(article.id));
-      this.service.deleteArticle(article.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => {
-          this.articles.update(list => list.filter(a => a.id !== article.id));
-          this.selectedIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-          this.deletingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-          if (this.expandedId() === article.id) this.expandedId.set(null);
-        },
-        error: () => {
-          this.deletingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-          this.error.set(`Failed to delete "${article.title}"`);
-        },
-      });
+      this.deleteArticle(article);
     }
   }
 
@@ -793,6 +826,7 @@ export class InboxComponent {
   expandedClusters = signal<Set<string>>(new Set());
   clusterSynthesis = signal<Record<string, string>>({});
   synthesizingCluster = signal<string | null>(null);
+  clusterBusyId = signal<string | null>(null);
 
   private clusterVersion = signal(0);
   clusters = computed(() => {
@@ -804,6 +838,10 @@ export class InboxComponent {
 
   refreshClusters(): void {
     this.clusterVersion.update(v => v + 1);
+    const clusterCount = this.clusters().length;
+    const grouped = this.clusteredArticleCount();
+    const unclustered = this.filteredArticles().length - grouped;
+    this.toast.success(`Reclustered: ${clusterCount} clusters — ${grouped} grouped, ${unclustered} unclustered`);
   }
 
   isClusterAllSelected(cluster: Cluster): boolean {
@@ -846,35 +884,64 @@ export class InboxComponent {
         this.synthesizingCluster.set(null);
       },
       error: () => {
-        this.error.set('Failed to synthesize cluster');
+        this.toast.error('Failed to synthesize cluster');
         this.synthesizingCluster.set(null);
       },
     });
   }
 
+  private finishClusterOp(ids: string[]): void {
+    this.clusterBusyId.set(null);
+    const idSet = new Set(ids);
+    this.savingIds.update(set => new Set([...set].filter(id => !idSet.has(id))));
+    this.deletingIds.update(set => new Set([...set].filter(id => !idSet.has(id))));
+    this.selectedIds.update(set => new Set([...set].filter(id => !idSet.has(id))));
+  }
+
   saveCluster(cluster: Cluster): void {
+    if (this.clusterBusyId()) return;
     const ids = cluster.articles.map(a => a.id);
+    this.clusterBusyId.set(cluster.id);
+    this.savingIds.update(set => new Set([...set, ...ids]));
+    const toast = this.toast.progress(`Saving ${ids.length} articles…`);
+
     this.service.saveArticles(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         const savedSet = new Set(ids);
         this.articles.update(list => list.filter(a => !savedSet.has(a.id)));
+        this.finishClusterOp(ids);
+        toast.success(`${ids.length} articles saved`);
       },
-      error: () => this.error.set('Failed to save cluster articles'),
+      error: () => {
+        this.finishClusterOp(ids);
+        toast.error('Failed to save cluster articles');
+      },
     });
   }
 
   deleteCluster(cluster: Cluster): void {
+    if (this.clusterBusyId()) return;
     const ids = cluster.articles.map(a => a.id);
+    this.clusterBusyId.set(cluster.id);
+    this.deletingIds.update(set => new Set([...set, ...ids]));
+    const toast = this.toast.progress(`Deleting ${ids.length} articles…`);
+
     this.service.bulkDelete(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         const deletedSet = new Set(ids);
         this.articles.update(list => list.filter(a => !deletedSet.has(a.id)));
+        this.finishClusterOp(ids);
+        toast.success(`${ids.length} articles deleted`);
       },
-      error: () => this.error.set('Failed to delete cluster articles'),
+      error: () => {
+        this.finishClusterOp(ids);
+        toast.error('Failed to delete cluster articles');
+      },
     });
   }
 
   saveBestArchiveRest(cluster: Cluster): void {
+    if (this.clusterBusyId()) return;
     // Sort by relevanceScore desc, then by importance
     const sorted = [...cluster.articles].sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
     const best = sorted[0];
@@ -882,19 +949,35 @@ export class InboxComponent {
 
     if (!best || rest.length === 0) return;
 
+    const ids = cluster.articles.map(a => a.id);
+    this.clusterBusyId.set(cluster.id);
+    this.savingIds.update(set => new Set(set).add(best.id));
+    this.deletingIds.update(set => new Set([...set, ...rest.map(a => a.id)]));
+    const toast = this.toast.progress(`Saving best + archiving ${rest.length} articles…`);
+
     // Save best
     this.service.saveArticles([best.id]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         // Delete rest
         this.service.bulkDelete(rest.map(a => a.id)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
           next: () => {
-            const removedIds = new Set([best.id, ...rest.map(a => a.id)]);
+            const removedIds = new Set(ids);
             this.articles.update(list => list.filter(a => !removedIds.has(a.id)));
+            this.finishClusterOp(ids);
+            toast.success(`Best saved, ${rest.length} archived`);
           },
-          error: () => this.error.set('Failed to archive rest of cluster'),
+          error: () => {
+            // Best is already saved and gone from the inbox — reflect that locally
+            this.articles.update(list => list.filter(a => a.id !== best.id));
+            this.finishClusterOp(ids);
+            toast.error('Best saved, but failed to archive the rest');
+          },
         });
       },
-      error: () => this.error.set('Failed to save best article'),
+      error: () => {
+        this.finishClusterOp(ids);
+        toast.error('Failed to save best article');
+      },
     });
   }
 
@@ -920,7 +1003,7 @@ export class InboxComponent {
       },
       error: () => {
         this.snoozingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-        this.error.set(`Failed to snooze "${article.title}"`);
+        this.toast.error(`Failed to snooze "${article.title}"`);
       },
     });
   }

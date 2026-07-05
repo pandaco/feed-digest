@@ -298,16 +298,21 @@
 
         <!-- Bulk bar for cluster selections -->
         @if (selectedCount() > 0) {
-          <div class="bulk-bar">
-            <span>{{ selectedCount() }} selected</span>
-            <div class="bulk-actions">
-              <button class="btn btn-success btn-sm" (click)="bulkSave()" [disabled]="saving() || deleting()">
-                {{ saving() ? 'Saving...' : 'Save selected' }}
+          <div class="bulk-bar" role="status">
+            <span class="bulk-count">{{ selectedCount() }} of {{ filteredArticles().length }} selected</span>
+            @if (selectedCount() < filteredArticles().length) {
+              <button class="btn btn-outline btn-sm" (click)="selectAllFiltered()">
+                Select all {{ filteredArticles().length }}
               </button>
-              <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="deleting() || saving()">
-                {{ deleting() ? 'Deleting...' : 'Delete selected' }}
-              </button>
-            </div>
+            }
+            <button class="btn btn-outline btn-sm" (click)="clearSelection()">Clear</button>
+            <span class="bulk-divider" aria-hidden="true"></span>
+            <button class="btn btn-success btn-sm" (click)="bulkSave()" [disabled]="saving() || deleting()">
+              {{ saving() ? 'Saving...' : 'Save selected' }}
+            </button>
+            <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="deleting() || saving()">
+              {{ deleting() ? 'Deleting...' : 'Delete selected' }}
+            </button>
           </div>
         }
 
@@ -317,6 +322,9 @@
               <span class="cluster-toggle">{{ isClusterExpanded(cluster.id) ? '\u25BC' : '\u25B6' }}</span>
               <span class="cluster-label">{{ cluster.label }}</span>
               <span class="cluster-article-count">{{ cluster.articles.length }} articles</span>
+              @if (clusterBusyId() === cluster.id) {
+                <span class="inline-spinner" aria-hidden="true"></span>
+              }
               <div class="cluster-tags">
                 @for (tag of cluster.sharedTags; track tag) {
                   <span [class]="tagBadgeClass(tag)">{{ tag }}</span>
@@ -326,14 +334,14 @@
             @if (isClusterExpanded(cluster.id)) {
               <div class="cluster-body">
                 <div class="cluster-actions">
-                  <button class="btn btn-sm btn-primary" (click)="saveBestArchiveRest(cluster); $event.stopPropagation()">
+                  <button class="btn btn-sm btn-primary" (click)="saveBestArchiveRest(cluster); $event.stopPropagation()" [disabled]="clusterBusyId() !== null">
                     Save best + archive rest
                   </button>
-                  <button class="btn btn-sm btn-success" (click)="saveCluster(cluster); $event.stopPropagation()">
-                    Save all
+                  <button class="btn btn-sm btn-success" (click)="saveCluster(cluster); $event.stopPropagation()" [disabled]="clusterBusyId() !== null">
+                    {{ clusterBusyId() === cluster.id ? 'Saving...' : 'Save all' }}
                   </button>
-                  <button class="btn btn-sm btn-danger" (click)="deleteCluster(cluster); $event.stopPropagation()">
-                    Delete all
+                  <button class="btn btn-sm btn-danger" (click)="deleteCluster(cluster); $event.stopPropagation()" [disabled]="clusterBusyId() !== null">
+                    {{ clusterBusyId() === cluster.id ? 'Deleting...' : 'Delete all' }}
                   </button>
                   <button class="btn btn-sm" (click)="synthesizeCluster(cluster); $event.stopPropagation()" [disabled]="synthesizingCluster() === cluster.id" style="border: 1px solid #e2e8f0;">
                     {{ synthesizingCluster() === cluster.id ? 'Synthesizing...' : 'Synthesize' }}
@@ -497,16 +505,21 @@
 
       <!-- Bulk action bar -->
       @if (selectedCount() > 0) {
-        <div class="bulk-bar">
-          <span>{{ selectedCount() }} selected</span>
-          <div class="bulk-actions">
-            <button class="btn btn-success btn-sm" (click)="bulkSave()" [disabled]="saving() || deleting()">
-              {{ saving() ? 'Saving...' : 'Save selected' }}
+        <div class="bulk-bar" role="status">
+          <span class="bulk-count">{{ selectedCount() }} of {{ filteredArticles().length }} selected</span>
+          @if (selectedCount() < filteredArticles().length) {
+            <button class="btn btn-outline btn-sm" (click)="selectAllFiltered()">
+              Select all {{ filteredArticles().length }}
             </button>
-            <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="deleting() || saving()">
-              {{ deleting() ? 'Deleting...' : 'Delete selected' }}
-            </button>
-          </div>
+          }
+          <button class="btn btn-outline btn-sm" (click)="clearSelection()">Clear</button>
+          <span class="bulk-divider" aria-hidden="true"></span>
+          <button class="btn btn-success btn-sm" (click)="bulkSave()" [disabled]="saving() || deleting()">
+            {{ saving() ? 'Saving...' : 'Save selected' }}
+          </button>
+          <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="deleting() || saving()">
+            {{ deleting() ? 'Deleting...' : 'Delete selected' }}
+          </button>
         </div>
       }
 
@@ -521,8 +534,10 @@
               <input
                 type="checkbox"
                 [checked]="allVisibleSelected()"
+                [indeterminate]="someVisibleSelected() && !allVisibleSelected()"
                 (change)="toggleSelectAll()"
-                title="Select all visible"
+                title="Select all articles on this page"
+                aria-label="Select all articles on this page"
               />
             </th>
             <th class="col-expand"></th>
@@ -569,7 +584,12 @@
               </td>
               <td class="article-tags">
                 @for (tag of article.tags; track tag) {
-                  <span [class]="tagBadgeClass(tag)">{{ tag }}</span>
+                  <button
+                    [class]="tagBadgeClass(tag) + ' badge-clickable'"
+                    [class.badge-tag-selected]="isTagSelected(tag)"
+                    (click)="toggleTag(tag)"
+                    [title]="isTagSelected(tag) ? 'Remove tag from filter' : 'Filter by this tag'"
+                  >{{ tag }}</button>
                 }
               </td>
               <td class="col-score">
