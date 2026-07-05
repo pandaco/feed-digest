@@ -256,18 +256,27 @@ evaluated in strict priority order:
 
 Angular standalone app at `http://localhost:4200`. Proxies `/api` to
 the NestJS server on `:3333` (`apps/dashboard/proxy.conf.json`).
+Action feedback (bulk progress, successes, errors) goes through a global
+toast stack (`ToastService` + `<app-toast/>` mounted in the app shell).
 
 **Views**
 
 - **Inbox** — list/cluster views, filters (importance, source, scraper
   source, tags, time range, free-text), sorts (date / run / importance /
-  score), bulk save/delete, snooze presets, AI summary on any subset,
-  one-click re-enrichment of untagged items via SSE progress, temporal
-  histogram, top tags/sources charts (click-to-filter), keyboard
-  shortcuts (`?`).
+  score), bulk save/delete with cross-page selection ("Select all N"
+  covers every filtered article, not just the current page) executed in
+  chunks with a progress toast, clickable tag badges on each row that
+  toggle the tag filter, automatic filter reset when a cleanup empties
+  the filtered view, snooze presets, AI summary on any subset, one-click
+  re-enrichment of untagged items via SSE progress, temporal histogram,
+  top tags/sources charts (click-to-filter), keyboard shortcuts (`?`).
+  Clusters group articles by dominant tag (plural/case variants folded),
+  narrowed by co-occurring tags to honor the configurable Min Tags /
+  Min Articles / Max Articles bounds.
 - **Triage** — single-article quick processing (Save / Pass / Skip)
   with shortcuts.
-- **Saved** — saved articles browser, same filters/sorts as Inbox.
+- **Saved** — saved articles browser, same filters/sorts and cross-page
+  bulk remove as Inbox.
 - **Snoozed** — snoozed list with expiry, manual unsnooze.
 - **Tag preferences** — selection scores, override per tag
   (`auto` / `filtered` / default), reset.
@@ -286,7 +295,7 @@ All require header `x-telegram-bot-api-secret-token` (skipped when
 | `GET`    | `/api/inbox`                                        | List active (non-snoozed) articles                     |
 | `GET`    | `/api/inbox/snoozed`                                | List snoozed articles                                  |
 | `POST`   | `/api/inbox/retag-untagged`                         | Re-enrich untagged inbox via LLM (SSE progress)        |
-| `POST`   | `/api/inbox/bulk-delete`                            | `{ articleIds: [...] }`                                |
+| `POST`   | `/api/inbox/bulk-delete`                            | `{ articleIds: [...], skipTagFeedback? }` — flag skips negative tag-preference feedback on mass cleanups |
 | `POST`   | `/api/inbox/save`                                   | Move articles to saved                                 |
 | `POST`   | `/api/inbox/summary`                                | AI summary (`{ period: 'today' \| 'week' \| 'month' }`) |
 | `POST`   | `/api/inbox/synthesize`                             | Synthesize selected articles                           |
