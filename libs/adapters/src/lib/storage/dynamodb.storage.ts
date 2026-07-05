@@ -2,13 +2,16 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
   QueryCommand,
-  DeleteCommand,
   BatchWriteCommand,
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { Article, StoragePort } from '@feed-digest/core';
 
 type Collection = 'INBOX' | 'ALL' | 'SAVED';
+
+type WriteRequest =
+  | { PutRequest: { Item: Record<string, unknown> } }
+  | { DeleteRequest: { Key: Record<string, unknown> } };
 
 export class DynamoDbStorage implements StoragePort {
   private docClient: DynamoDBDocumentClient;
@@ -239,38 +242,45 @@ export class DynamoDbStorage implements StoragePort {
 
   private async deleteFromCollection(articleIds: string[], collection: Collection): Promise<void> {
     // SK = articleId, so we always know the full key — no pre-query needed
-    await Promise.all(
-      articleIds.map(id =>
-        this.docClient.send(
-          new DeleteCommand({
-            TableName: this.tableName,
-            Key: { PK: `${collection}#${id}`, SK: id },
-          })
-        )
-      )
-    );
+    const requests = articleIds.map(id => ({
+      DeleteRequest: { Key: { PK: `${collection}#${id}`, SK: id } },
+    }));
+    await this.sendBatchedRequests(requests);
     console.log(`[DynamoDbStorage] Deleted ${articleIds.length} articles from ${collection}`);
   }
 
   private async batchWrite(articles: Article[], collection: Collection): Promise<void> {
     if (articles.length === 0) return;
-    const items = articles.map(a => this.articleToItem(a, collection));
+    const requests = articles.map(a => ({ PutRequest: { Item: this.articleToItem(a, collection) } }));
+    await this.sendBatchedRequests(requests);
+  }
 
-    for (let i = 0; i < items.length; i += 25) {
-      const batch = items.slice(i, i + 25);
-      let requests = batch.map(item => ({ PutRequest: { Item: item } }));
+  // BatchWriteCommand caps at 25 requests; run a few batches in parallel and
+  // retry unprocessed items with exponential backoff.
+  private async sendBatchedRequests(allRequests: WriteRequest[]): Promise<void> {
+    const batches: WriteRequest[][] = [];
+    for (let i = 0; i < allRequests.length; i += 25) {
+      batches.push(allRequests.slice(i, i + 25));
+    }
 
-      let retries = 0;
-      while (requests.length > 0 && retries < 5) {
-        const result = await this.docClient.send(
-          new BatchWriteCommand({ RequestItems: { [this.tableName]: requests } })
-        );
-        const unprocessed = result.UnprocessedItems?.[this.tableName] ?? [];
-        requests = unprocessed as { PutRequest: { Item: Record<string, unknown> } }[];
-        if (requests.length > 0) {
-          retries++;
-          await new Promise(r => setTimeout(r, Math.pow(2, retries) * 100));
-        }
+    const concurrency = 4;
+    for (let i = 0; i < batches.length; i += concurrency) {
+      await Promise.all(batches.slice(i, i + concurrency).map(batch => this.sendBatchWithRetry(batch)));
+    }
+  }
+
+  private async sendBatchWithRetry(batch: WriteRequest[]): Promise<void> {
+    let requests = batch;
+    let retries = 0;
+    while (requests.length > 0 && retries < 5) {
+      const result = await this.docClient.send(
+        new BatchWriteCommand({ RequestItems: { [this.tableName]: requests } })
+      );
+      const unprocessed = result.UnprocessedItems?.[this.tableName] ?? [];
+      requests = unprocessed as WriteRequest[];
+      if (requests.length > 0) {
+        retries++;
+        await new Promise(r => setTimeout(r, Math.pow(2, retries) * 100));
       }
     }
   }
