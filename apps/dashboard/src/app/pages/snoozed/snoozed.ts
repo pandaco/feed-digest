@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed, DestroyRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { InboxService, Article } from '../../services/inbox.service';
+import { ToastService } from '../../services/toast.service';
 import { formatDate } from '../../shared/format';
 import { formatSnoozeDate } from '../../shared/snooze.utils';
 
@@ -11,6 +12,7 @@ import { formatSnoozeDate } from '../../shared/snooze.utils';
 })
 export class SnoozedComponent {
   private service = inject(InboxService);
+  private toast = inject(ToastService);
   private destroyRef = inject(DestroyRef);
 
   constructor() {
@@ -53,7 +55,7 @@ export class SnoozedComponent {
       },
       error: () => {
         this.unsnoozing.update(set => { const next = new Set(set); next.delete(article.id); return next; });
-        this.error.set(`Failed to unsnooze "${article.title}"`);
+        this.toast.error(`Failed to unsnooze "${article.title}"`);
       },
     });
   }

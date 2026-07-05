@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { TagPreferenceService, TagPreferenceResponse, TagOverride } from '../../services/tag-preference.service';
 import { AuthService } from '../../services/auth.service';
+import { ToastService } from '../../services/toast.service';
 import { formatDate, formatScore } from '../../shared/format';
 
 type TagState = 'auto' | 'filtered' | 'default';
@@ -29,6 +30,7 @@ interface TagRow {
 export class TagPreferencesComponent {
   private service = inject(TagPreferenceService);
   protected auth = inject(AuthService);
+  private toast = inject(ToastService);
   private destroyRef = inject(DestroyRef);
   private errorTimer?: ReturnType<typeof setTimeout>;
 
@@ -158,9 +160,10 @@ export class TagPreferencesComponent {
       next: () => {
         this.data.set(null);
         this.loading.set(false);
+        this.toast.success('Tag preferences reset');
       },
       error: () => {
-        this.error.set('Failed to reset preferences');
+        this.toast.error('Failed to reset preferences');
         this.loading.set(false);
       },
     });
@@ -174,7 +177,7 @@ export class TagPreferencesComponent {
 
     this.service.setTagOverride(id, tag.name, override).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.loadPreferences(),
-      error: () => this.error.set(`Failed to update "${tag.name}"`),
+      error: () => this.toast.error(`Failed to update "${tag.name}"`),
     });
   }
 

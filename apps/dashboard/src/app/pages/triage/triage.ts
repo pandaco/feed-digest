@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { InboxService, Article } from '../../services/inbox.service';
 import { AuthService } from '../../services/auth.service';
+import { ToastService } from '../../services/toast.service';
 import { formatDate } from '../../shared/format';
 
 @Component({
@@ -14,6 +15,7 @@ import { formatDate } from '../../shared/format';
 export class TriageComponent {
   private service = inject(InboxService);
   private auth = inject(AuthService);
+  private toast = inject(ToastService);
   private destroyRef = inject(DestroyRef);
   private errorTimer?: ReturnType<typeof setTimeout>;
 
@@ -223,7 +225,7 @@ export class TriageComponent {
         this.advanceToNext();
       },
       error: () => {
-        this.error.set(`Failed to save "${article.title}"`);
+        this.toast.error(`Failed to save "${article.title}"`);
         this.saving.set(false);
       },
     });
@@ -247,7 +249,7 @@ export class TriageComponent {
         this.advanceToNext();
       },
       error: () => {
-        this.error.set(`Failed to skip "${article.title}"`);
+        this.toast.error(`Failed to skip "${article.title}"`);
         this.skipping.set(false);
       },
     });
