@@ -98,8 +98,9 @@ export class InboxController {
       throw new HttpException('articleIds must be a non-empty array', HttpStatus.BAD_REQUEST);
     }
     try {
+      const idSet = new Set(articleIds);
       const allArticles = await this.storage.getFromInbox();
-      const toSynthesize = allArticles.filter(a => articleIds.includes(a.id));
+      const toSynthesize = allArticles.filter(a => idSet.has(a.id));
       if (toSynthesize.length === 0) {
         throw new HttpException('No matching articles found', HttpStatus.NOT_FOUND);
       }
@@ -176,20 +177,27 @@ export class InboxController {
   }
 
   @Post('bulk-delete')
-  async bulkDelete(@Body() body: { articleIds: string[] }) {
-    const { articleIds } = body;
+  async bulkDelete(@Body() body: { articleIds: string[]; skipTagFeedback?: boolean }) {
+    const { articleIds, skipTagFeedback } = body;
     if (!Array.isArray(articleIds) || articleIds.length === 0) {
       throw new HttpException('articleIds must be a non-empty array', HttpStatus.BAD_REQUEST);
     }
     try {
-      const allArticles = await this.storage.getFromInbox();
-      const toDelete = allArticles.filter(a => articleIds.includes(a.id));
-      await this.storage.deleteFromInbox(articleIds);
-      if (this.chatId && toDelete.length > 0) {
-        const selections = tagsToSelections(toDelete, false);
-        if (Object.keys(selections).length > 0) {
-          await this.tagPreference.record(this.chatId, selections).catch(() => {});
+      // Mass cleanups (skipTagFeedback) shouldn't count as a negative signal
+      // on every deleted tag — and skipping also avoids the full inbox scan.
+      if (this.chatId && !skipTagFeedback) {
+        const idSet = new Set(articleIds);
+        const allArticles = await this.storage.getFromInbox();
+        const toDelete = allArticles.filter(a => idSet.has(a.id));
+        await this.storage.deleteFromInbox(articleIds);
+        if (toDelete.length > 0) {
+          const selections = tagsToSelections(toDelete, false);
+          if (Object.keys(selections).length > 0) {
+            await this.tagPreference.record(this.chatId, selections).catch(() => undefined);
+          }
         }
+      } else {
+        await this.storage.deleteFromInbox(articleIds);
       }
       return { deleted: articleIds.length };
     } catch (error) {
@@ -205,8 +213,9 @@ export class InboxController {
       throw new HttpException('articleIds must be a non-empty array', HttpStatus.BAD_REQUEST);
     }
     try {
+      const idSet = new Set(articleIds);
       const allArticles = await this.storage.getFromInbox();
-      const toSave = allArticles.filter(a => articleIds.includes(a.id));
+      const toSave = allArticles.filter(a => idSet.has(a.id));
       if (toSave.length === 0) {
         throw new HttpException('No matching articles found in inbox', HttpStatus.NOT_FOUND);
       }
@@ -215,7 +224,7 @@ export class InboxController {
       if (this.chatId) {
         const selections = tagsToSelections(toSave, true);
         if (Object.keys(selections).length > 0) {
-          await this.tagPreference.record(this.chatId, selections).catch(() => {});
+          await this.tagPreference.record(this.chatId, selections).catch(() => undefined);
         }
       }
       return { saved: toSave.length };
@@ -276,7 +285,7 @@ export class InboxController {
       if (this.chatId && article) {
         const selections = tagsToSelections([article], false);
         if (Object.keys(selections).length > 0) {
-          await this.tagPreference.record(this.chatId, selections).catch(() => {});
+          await this.tagPreference.record(this.chatId, selections).catch(() => undefined);
         }
       }
       return { message: 'Article deleted' };

@@ -49,10 +49,10 @@ export class InboxService {
     );
   }
 
-  bulkDelete(articleIds: string[]): Observable<{ deleted: number }> {
+  bulkDelete(articleIds: string[], opts?: { skipTagFeedback?: boolean }): Observable<{ deleted: number }> {
     return this.http.post<{ deleted: number }>(
       `${this.apiBase}/bulk-delete`,
-      { articleIds },
+      { articleIds, ...(opts?.skipTagFeedback ? { skipTagFeedback: true } : {}) },
     );
   }
 
