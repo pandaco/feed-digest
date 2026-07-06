@@ -270,9 +270,14 @@ toast stack (`ToastService` + `<app-toast/>` mounted in the app shell).
   the filtered view, snooze presets, AI summary on any subset, one-click
   re-enrichment of untagged items via SSE progress, temporal histogram,
   top tags/sources charts (click-to-filter), keyboard shortcuts (`?`).
-  Clusters group articles by dominant tag (plural/case variants folded),
-  narrowed by co-occurring tags to honor the configurable Min Tags /
-  Min Articles / Max Articles bounds.
+  Clusters group articles by dominant tag (case variants always folded;
+  a plural folds only when the singular also appears in the tag set),
+  narrowed by co-occurring tags; a dominant tag that can't reach the
+  configured Min Tags coherence is retired instead of emitted, so every
+  cluster honors the Min Tags / Min Articles / Max Articles bounds.
+  Cluster save/delete/save-best run through the same chunked bulk driver
+  as the selection-based actions (progress toast, confirm above the mass
+  threshold, failed chunks stay listed and selected for retry).
 - **Triage** — single-article quick processing (Save / Pass / Skip)
   with shortcuts.
 - **Saved** — saved articles browser, same filters/sorts and cross-page
