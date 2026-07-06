@@ -1,4 +1,4 @@
-<div class="toast-stack" aria-live="polite">
+<div class="toast-stack">
   @for (t of toast.toasts(); track t.id) {
     <div
       class="toast"
@@ -14,9 +14,7 @@
         @if (t.kind === 'progress' && t.total) {
           <span class="toast-count">{{ t.current ?? 0 }} / {{ t.total }}</span>
         }
-        @if (t.kind === 'error') {
-          <button class="toast-dismiss" (click)="toast.dismiss(t.id)" aria-label="Dismiss">&#10005;</button>
-        }
+        <button class="toast-dismiss" (click)="toast.dismiss(t.id)" aria-label="Dismiss">&#10005;</button>
       </div>
       @if (t.kind === 'progress' && t.total) {
         <div class="toast-bar">

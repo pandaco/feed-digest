@@ -65,7 +65,8 @@
   border: 2px solid var(--primary-soft);
   border-top-color: var(--primary);
   border-radius: 50%;
-  animation: toast-spin 0.7s linear infinite;
+  // `spin` is the shared global keyframe from styles.scss (see .inline-spinner)
+  animation: spin 0.7s linear infinite;
 }
 
 .toast-bar {
@@ -81,12 +82,6 @@
   background: var(--primary);
   border-radius: 2px;
   transition: width 0.2s ease;
-}
-
-@keyframes toast-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @keyframes toast-in {

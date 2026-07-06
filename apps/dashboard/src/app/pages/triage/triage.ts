@@ -212,7 +212,6 @@ export class TriageComponent {
     if (!article || this.saving() || this.skipping()) return;
 
     this.saving.set(true);
-    this.error.set(null);
 
     const idx = this.currentIndex();
     this.service.saveArticles([article.id]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -236,7 +235,6 @@ export class TriageComponent {
     if (!article || this.saving() || this.skipping()) return;
 
     this.skipping.set(true);
-    this.error.set(null);
 
     const idx = this.currentIndex();
     this.service.deleteArticle(article.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
