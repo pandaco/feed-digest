@@ -89,16 +89,16 @@
     <section class="table-section">
       <div class="table-header">
         <div class="filter-tabs" role="tablist" aria-label="Filter by importance">
-          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'all'" [class.active]="importanceFilter() === 'all'" (click)="importanceFilter.set('all')">
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'all'" [class.active]="importanceFilter() === 'all'" (click)="setImportanceFilter('all')">
             All ({{ totalCount() }})
           </button>
-          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'high'" [class.active]="importanceFilter() === 'high'" (click)="importanceFilter.set('high')">
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'high'" [class.active]="importanceFilter() === 'high'" (click)="setImportanceFilter('high')">
             High ({{ highCount() }})
           </button>
-          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'medium'" [class.active]="importanceFilter() === 'medium'" (click)="importanceFilter.set('medium')">
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'medium'" [class.active]="importanceFilter() === 'medium'" (click)="setImportanceFilter('medium')">
             Medium ({{ mediumCount() }})
           </button>
-          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'low'" [class.active]="importanceFilter() === 'low'" (click)="importanceFilter.set('low')">
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'low'" [class.active]="importanceFilter() === 'low'" (click)="setImportanceFilter('low')">
             Low ({{ lowCount() }})
           </button>
         </div>
@@ -109,7 +109,7 @@
             type="text"
             placeholder="Search title, tags or summary..."
             [ngModel]="searchQuery()"
-            (ngModelChange)="searchQuery.set($event)"
+            (ngModelChange)="setSearchQuery($event)"
           />
 
           <button
@@ -155,7 +155,7 @@
               id="scraper-filter-saved"
               class="filter-select"
               [ngModel]="scraperSourceFilter()"
-              (ngModelChange)="scraperSourceFilter.set($event)"
+              (ngModelChange)="setScraperSourceFilter($event)"
             >
               <option value="all">All Scrapers</option>
               @for (src of uniqueScraperSources(); track src) {

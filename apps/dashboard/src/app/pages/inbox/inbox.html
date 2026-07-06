@@ -307,10 +307,10 @@
             }
             <button class="btn btn-outline btn-sm" (click)="clearSelection()">Clear</button>
             <span class="bulk-divider" aria-hidden="true"></span>
-            <button class="btn btn-success btn-sm" (click)="bulkSave()" [disabled]="saving() || deleting()">
+            <button class="btn btn-success btn-sm" (click)="bulkSave()" [disabled]="bulkOpInFlight()">
               {{ saving() ? 'Saving...' : 'Save selected' }}
             </button>
-            <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="deleting() || saving()">
+            <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="bulkOpInFlight()">
               {{ deleting() ? 'Deleting...' : 'Delete selected' }}
             </button>
           </div>
@@ -334,13 +334,13 @@
             @if (isClusterExpanded(cluster.id)) {
               <div class="cluster-body">
                 <div class="cluster-actions">
-                  <button class="btn btn-sm btn-primary" (click)="saveBestArchiveRest(cluster); $event.stopPropagation()" [disabled]="clusterBusyId() !== null">
+                  <button class="btn btn-sm btn-primary" (click)="saveBestArchiveRest(cluster); $event.stopPropagation()" [disabled]="bulkOpInFlight()">
                     Save best + archive rest
                   </button>
-                  <button class="btn btn-sm btn-success" (click)="saveCluster(cluster); $event.stopPropagation()" [disabled]="clusterBusyId() !== null">
+                  <button class="btn btn-sm btn-success" (click)="saveCluster(cluster); $event.stopPropagation()" [disabled]="bulkOpInFlight()">
                     {{ clusterBusyId() === cluster.id ? 'Saving...' : 'Save all' }}
                   </button>
-                  <button class="btn btn-sm btn-danger" (click)="deleteCluster(cluster); $event.stopPropagation()" [disabled]="clusterBusyId() !== null">
+                  <button class="btn btn-sm btn-danger" (click)="deleteCluster(cluster); $event.stopPropagation()" [disabled]="bulkOpInFlight()">
                     {{ clusterBusyId() === cluster.id ? 'Deleting...' : 'Delete all' }}
                   </button>
                   <button class="btn btn-sm" (click)="synthesizeCluster(cluster); $event.stopPropagation()" [disabled]="synthesizingCluster() === cluster.id" style="border: 1px solid #e2e8f0;">
@@ -395,18 +395,18 @@
     <section class="table-section">
       <div class="table-header">
         <div class="filter-tabs" role="tablist" aria-label="Filter by importance">
-          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'all'" [class.active]="importanceFilter() === 'all'" (click)="importanceFilter.set('all')">
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'all'" [class.active]="importanceFilter() === 'all'" (click)="setImportanceFilter('all')">
             All ({{ totalCount() }})
           </button>
-          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'high'" [class.active]="importanceFilter() === 'high'" (click)="importanceFilter.set('high')"
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'high'" [class.active]="importanceFilter() === 'high'" (click)="setImportanceFilter('high')"
             [title]="importanceTooltip('high')">
             High ({{ highCount() }})
           </button>
-          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'medium'" [class.active]="importanceFilter() === 'medium'" (click)="importanceFilter.set('medium')"
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'medium'" [class.active]="importanceFilter() === 'medium'" (click)="setImportanceFilter('medium')"
             [title]="importanceTooltip('medium')">
             Medium ({{ mediumCount() }})
           </button>
-          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'low'" [class.active]="importanceFilter() === 'low'" (click)="importanceFilter.set('low')"
+          <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'low'" [class.active]="importanceFilter() === 'low'" (click)="setImportanceFilter('low')"
             [title]="importanceTooltip('low')">
             Low ({{ lowCount() }})
           </button>
@@ -418,7 +418,7 @@
             type="text"
             placeholder="Search title, tags or summary..."
             [ngModel]="searchQuery()"
-            (ngModelChange)="searchQuery.set($event)"
+            (ngModelChange)="setSearchQuery($event)"
           />
 
           <button
@@ -470,7 +470,7 @@
               id="scraper-filter"
               class="filter-select"
               [ngModel]="scraperSourceFilter()"
-              (ngModelChange)="scraperSourceFilter.set($event)"
+              (ngModelChange)="setScraperSourceFilter($event)"
             >
               <option value="all">All Scrapers</option>
               @for (src of uniqueScraperSources(); track src) {
@@ -514,10 +514,10 @@
           }
           <button class="btn btn-outline btn-sm" (click)="clearSelection()">Clear</button>
           <span class="bulk-divider" aria-hidden="true"></span>
-          <button class="btn btn-success btn-sm" (click)="bulkSave()" [disabled]="saving() || deleting()">
+          <button class="btn btn-success btn-sm" (click)="bulkSave()" [disabled]="bulkOpInFlight()">
             {{ saving() ? 'Saving...' : 'Save selected' }}
           </button>
-          <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="deleting() || saving()">
+          <button class="btn btn-danger btn-sm" (click)="bulkDelete()" [disabled]="bulkOpInFlight()">
             {{ deleting() ? 'Deleting...' : 'Delete selected' }}
           </button>
         </div>

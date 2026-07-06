@@ -33,8 +33,8 @@ export class ToastService {
     this.push({ kind: 'error', message });
   }
 
-  progress(message: string): ProgressToastHandle {
-    const id = this.push({ kind: 'progress', message });
+  progress(message: string, total?: number): ProgressToastHandle {
+    const id = this.push({ kind: 'progress', message, ...(total !== undefined ? { current: 0, total } : {}) });
     return {
       update: (current, total) => this.patch(id, { current, total }),
       success: (msg) => {

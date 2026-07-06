@@ -52,7 +52,8 @@ export class InboxService {
   bulkDelete(articleIds: string[], opts?: { skipTagFeedback?: boolean }): Observable<{ deleted: number }> {
     return this.http.post<{ deleted: number }>(
       `${this.apiBase}/bulk-delete`,
-      { articleIds, ...(opts?.skipTagFeedback ? { skipTagFeedback: true } : {}) },
+      // undefined is dropped by JSON serialization, so the flag is only sent when set
+      { articleIds, skipTagFeedback: opts?.skipTagFeedback },
     );
   }
 

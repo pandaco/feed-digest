@@ -1,14 +1,15 @@
-import { Component, inject, signal, computed, effect, DestroyRef, HostListener, SecurityContext, afterNextRender } from '@angular/core';
+import { Component, inject, signal, computed, effect, DestroyRef, HostListener, SecurityContext, afterNextRender, WritableSignal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { InboxService, Article, RetagProgress } from '../../services/inbox.service';
 import { TagPreferenceService } from '../../services/tag-preference.service';
 import { AuthService } from '../../services/auth.service';
 import { ClusterConfigService, ClusterConfig } from '../../services/cluster-config.service';
 import { ToastService } from '../../services/toast.service';
-import { runChunked } from '../../shared/bulk-actions';
+import { runChunked, runBulkOp, withoutIds, BulkOpContext, MASS_ACTION_THRESHOLD } from '../../shared/bulk-actions';
 import { formatDate } from '../../shared/format';
 import { getSnoozePresets, SnoozePreset } from '../../shared/snooze.utils';
 import { clusterArticles, getUnclusteredArticles, Cluster } from '../../shared/clustering.utils';
@@ -64,28 +65,53 @@ export class InboxComponent {
       }
     });
 
-    // Remap expanded clusters when cluster IDs change (e.g. after save/delete shifts shared tags)
+    // Remap cluster-keyed state (expansion, synthesis) when cluster IDs
+    // change — ids embed the newest article id, so removing that article
+    // shifts the id even when most members are untouched.
     effect(() => {
       const newClusters = this.clusters();
-      const expanded = this.expandedClusters();
       const prevMap = this.prevClusterArticles;
 
       const newIdSet = new Set(newClusters.map(c => c.id));
-      const lost = [...expanded].filter(id => !newIdSet.has(id));
+      const knownIds = new Set([
+        ...this.expandedClusters(),
+        ...Object.keys(this.clusterSynthesis()),
+      ]);
+      const lost = [...knownIds].filter(id => !newIdSet.has(id));
 
       if (lost.length > 0) {
-        const updated = new Set(expanded);
+        const successorOf = new Map<string, string>();
         for (const lostId of lost) {
-          updated.delete(lostId);
           const oldArticleIds = prevMap.get(lostId);
-          if (oldArticleIds) {
-            const successor = newClusters.find(c =>
-              c.articles.some(a => oldArticleIds.includes(a.id))
-            );
-            if (successor) updated.add(successor.id);
-          }
+          if (!oldArticleIds) continue;
+          const successor = newClusters.find(c =>
+            c.articles.some(a => oldArticleIds.includes(a.id))
+          );
+          if (successor) successorOf.set(lostId, successor.id);
         }
-        this.expandedClusters.set(updated);
+
+        this.expandedClusters.update(expanded => {
+          const updated = new Set(expanded);
+          for (const lostId of lost) {
+            if (!updated.delete(lostId)) continue;
+            const successorId = successorOf.get(lostId);
+            if (successorId) updated.add(successorId);
+          }
+          return updated;
+        });
+
+        this.clusterSynthesis.update(map => {
+          const updated = { ...map };
+          for (const lostId of lost) {
+            if (!(lostId in updated)) continue;
+            const successorId = successorOf.get(lostId);
+            if (successorId && !(successorId in updated)) {
+              updated[successorId] = updated[lostId];
+            }
+            delete updated[lostId];
+          }
+          return updated;
+        });
       }
 
       prevMap.clear();
@@ -372,6 +398,23 @@ export class InboxComponent {
     this.timeFilter() !== null
   );
 
+  // Filter changes clear the selection (like toggleTag/toggleSource do):
+  // a stale cross-page selection can otherwise exceed the filtered view.
+  setImportanceFilter(value: ImportanceFilter): void {
+    this.importanceFilter.set(value);
+    this.selectedIds.set(new Set());
+  }
+
+  setScraperSourceFilter(value: string): void {
+    this.scraperSourceFilter.set(value);
+    this.selectedIds.set(new Set());
+  }
+
+  setSearchQuery(value: string): void {
+    this.searchQuery.set(value);
+    this.selectedIds.set(new Set());
+  }
+
   // Tag filter
   isTagSelected(tag: string): boolean {
     return this.selectedTags().has(tag);
@@ -447,50 +490,43 @@ export class InboxComponent {
     }
   }
 
+  // One in-flight bulk/cluster operation at a time: they share the
+  // articles/selection/busy signals and would clobber each other's state.
+  bulkOpInFlight = computed(() => this.deleting() || this.saving() || this.clusterBusyId() !== null);
+
+  private bulkCtx(busyIds: WritableSignal<Set<string>>): BulkOpContext {
+    return {
+      articles: this.articles,
+      selectedIds: this.selectedIds,
+      busyIds,
+      expandedId: this.expandedId,
+      toast: this.toast,
+      afterFinish: () => this.clearFiltersIfViewEmpty(),
+    };
+  }
+
   async bulkDelete(): Promise<void> {
     const ids = [...this.selectedIds()];
-    if (ids.length === 0 || this.deleting()) return;
-    // A selection larger than one page is a cleanup, not a content judgement:
-    // guard it with a confirm and skip the tag-preference negative feedback.
-    const massDelete = ids.length > PAGE_SIZE;
+    if (ids.length === 0 || this.bulkOpInFlight()) return;
+    // A large selection is a cleanup, not a content judgement: guard it
+    // with a confirm and skip the tag-preference negative feedback.
+    const massDelete = ids.length > MASS_ACTION_THRESHOLD;
     if (massDelete && !confirm(`Delete ${ids.length} articles? This cannot be undone.`)) return;
 
     this.deleting.set(true);
-    this.deletingIds.set(new Set(ids));
-
-    const toast = this.toast.progress(`Deleting ${ids.length} articles…`);
-    toast.update(0, ids.length);
-
-    const result = await runChunked(
+    await runBulkOp(
+      this.bulkCtx(this.deletingIds),
       ids,
       chunk => this.service.bulkDelete(chunk, { skipTagFeedback: massDelete }),
-      {
-        onChunkDone: (chunk, processed) => {
-          const chunkSet = new Set(chunk);
-          this.articles.update(list => list.filter(a => !chunkSet.has(a.id)));
-          toast.update(processed, ids.length);
-        },
-      },
+      { progress: 'Deleting', past: 'deleted' },
     );
-
-    this.selectedIds.set(new Set());
-    this.deletingIds.set(new Set());
-    const expanded = this.expandedId();
-    if (expanded && !this.articles().some(a => a.id === expanded)) {
-      this.expandedId.set(null);
-    }
     this.deleting.set(false);
-
-    if (result.failed === 0) {
-      toast.success(`${result.done} article${result.done > 1 ? 's' : ''} deleted`);
-    } else {
-      toast.error(`${result.done} deleted, ${result.failed} failed`);
-    }
-    this.clearFiltersIfViewEmpty();
   }
 
   saveArticle(article: Article): void {
-    if (this.savingIds().has(article.id)) return;
+    // isBusy covers both sets: a row mid-delete (or mid-bulk-op) must not
+    // race a concurrent save of the same article.
+    if (this.isBusy(article.id)) return;
 
     this.savingIds.update(set => new Set(set).add(article.id));
 
@@ -511,36 +547,16 @@ export class InboxComponent {
 
   async bulkSave(): Promise<void> {
     const ids = [...this.selectedIds()];
-    if (ids.length === 0 || this.saving()) return;
+    if (ids.length === 0 || this.bulkOpInFlight()) return;
 
     this.saving.set(true);
-    this.savingIds.set(new Set(ids));
-
-    const toast = this.toast.progress(`Saving ${ids.length} articles…`);
-    toast.update(0, ids.length);
-
-    const result = await runChunked(ids, chunk => this.service.saveArticles(chunk), {
-      onChunkDone: (chunk, processed) => {
-        const chunkSet = new Set(chunk);
-        this.articles.update(list => list.filter(a => !chunkSet.has(a.id)));
-        toast.update(processed, ids.length);
-      },
-    });
-
-    this.selectedIds.set(new Set());
-    this.savingIds.set(new Set());
-    const expanded = this.expandedId();
-    if (expanded && !this.articles().some(a => a.id === expanded)) {
-      this.expandedId.set(null);
-    }
+    await runBulkOp(
+      this.bulkCtx(this.savingIds),
+      ids,
+      chunk => this.service.saveArticles(chunk),
+      { progress: 'Saving', past: 'saved' },
+    );
     this.saving.set(false);
-
-    if (result.failed === 0) {
-      toast.success(`${result.done} article${result.done > 1 ? 's' : ''} saved`);
-    } else {
-      toast.error(`${result.done} saved, ${result.failed} failed`);
-    }
-    this.clearFiltersIfViewEmpty();
   }
 
   loadInbox(): void {
@@ -648,7 +664,7 @@ export class InboxComponent {
   }
 
   deleteArticle(article: Article): void {
-    if (this.deletingIds().has(article.id)) return;
+    if (this.isBusy(article.id)) return;
 
     this.deletingIds.update(set => new Set(set).add(article.id));
 
@@ -890,58 +906,41 @@ export class InboxComponent {
     });
   }
 
-  private finishClusterOp(ids: string[]): void {
+  // Cluster ops share the chunked bulk driver: same chunking (API timeout),
+  // same confirm threshold, and a toast that resolves on every path — these
+  // deliberately do NOT use takeUntilDestroyed, so navigating away lets the
+  // operation finish instead of stranding a progress toast forever.
+  async saveCluster(cluster: Cluster): Promise<void> {
+    if (this.bulkOpInFlight()) return;
+    const ids = cluster.articles.map(a => a.id);
+    this.clusterBusyId.set(cluster.id);
+    await runBulkOp(
+      this.bulkCtx(this.savingIds),
+      ids,
+      chunk => this.service.saveArticles(chunk),
+      { progress: 'Saving', past: 'saved' },
+    );
     this.clusterBusyId.set(null);
-    const idSet = new Set(ids);
-    this.savingIds.update(set => new Set([...set].filter(id => !idSet.has(id))));
-    this.deletingIds.update(set => new Set([...set].filter(id => !idSet.has(id))));
-    this.selectedIds.update(set => new Set([...set].filter(id => !idSet.has(id))));
   }
 
-  saveCluster(cluster: Cluster): void {
-    if (this.clusterBusyId()) return;
+  async deleteCluster(cluster: Cluster): Promise<void> {
+    if (this.bulkOpInFlight()) return;
     const ids = cluster.articles.map(a => a.id);
+    if (ids.length > MASS_ACTION_THRESHOLD && !confirm(`Delete ${ids.length} articles? This cannot be undone.`)) return;
     this.clusterBusyId.set(cluster.id);
-    this.savingIds.update(set => new Set([...set, ...ids]));
-    const toast = this.toast.progress(`Saving ${ids.length} articles…`);
-
-    this.service.saveArticles(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        const savedSet = new Set(ids);
-        this.articles.update(list => list.filter(a => !savedSet.has(a.id)));
-        this.finishClusterOp(ids);
-        toast.success(`${ids.length} articles saved`);
-      },
-      error: () => {
-        this.finishClusterOp(ids);
-        toast.error('Failed to save cluster articles');
-      },
-    });
+    // No skipTagFeedback here: deleting a topical cluster IS a content
+    // judgement, unlike a cross-page mass cleanup.
+    await runBulkOp(
+      this.bulkCtx(this.deletingIds),
+      ids,
+      chunk => this.service.bulkDelete(chunk),
+      { progress: 'Deleting', past: 'deleted' },
+    );
+    this.clusterBusyId.set(null);
   }
 
-  deleteCluster(cluster: Cluster): void {
-    if (this.clusterBusyId()) return;
-    const ids = cluster.articles.map(a => a.id);
-    this.clusterBusyId.set(cluster.id);
-    this.deletingIds.update(set => new Set([...set, ...ids]));
-    const toast = this.toast.progress(`Deleting ${ids.length} articles…`);
-
-    this.service.bulkDelete(ids).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        const deletedSet = new Set(ids);
-        this.articles.update(list => list.filter(a => !deletedSet.has(a.id)));
-        this.finishClusterOp(ids);
-        toast.success(`${ids.length} articles deleted`);
-      },
-      error: () => {
-        this.finishClusterOp(ids);
-        toast.error('Failed to delete cluster articles');
-      },
-    });
-  }
-
-  saveBestArchiveRest(cluster: Cluster): void {
-    if (this.clusterBusyId()) return;
+  async saveBestArchiveRest(cluster: Cluster): Promise<void> {
+    if (this.bulkOpInFlight()) return;
     // Sort by relevanceScore desc, then by importance
     const sorted = [...cluster.articles].sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0));
     const best = sorted[0];
@@ -949,36 +948,45 @@ export class InboxComponent {
 
     if (!best || rest.length === 0) return;
 
-    const ids = cluster.articles.map(a => a.id);
     this.clusterBusyId.set(cluster.id);
     this.savingIds.update(set => new Set(set).add(best.id));
-    this.deletingIds.update(set => new Set([...set, ...rest.map(a => a.id)]));
-    const toast = this.toast.progress(`Saving best + archiving ${rest.length} articles…`);
+    const total = rest.length + 1;
+    const toast = this.toast.progress(`Saving best + archiving ${rest.length} articles…`, total);
 
-    // Save best
-    this.service.saveArticles([best.id]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        // Delete rest
-        this.service.bulkDelete(rest.map(a => a.id)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-          next: () => {
-            const removedIds = new Set(ids);
-            this.articles.update(list => list.filter(a => !removedIds.has(a.id)));
-            this.finishClusterOp(ids);
-            toast.success(`Best saved, ${rest.length} archived`);
-          },
-          error: () => {
-            // Best is already saved and gone from the inbox — reflect that locally
-            this.articles.update(list => list.filter(a => a.id !== best.id));
-            this.finishClusterOp(ids);
-            toast.error('Best saved, but failed to archive the rest');
-          },
-        });
-      },
-      error: () => {
-        this.finishClusterOp(ids);
-        toast.error('Failed to save best article');
+    try {
+      await firstValueFrom(this.service.saveArticles([best.id]));
+    } catch (err) {
+      console.error('[bulk] failed to save best article:', err);
+      this.savingIds.update(set => withoutIds(set, [best.id]));
+      this.clusterBusyId.set(null);
+      toast.error('Failed to save best article');
+      return;
+    }
+
+    this.articles.update(list => list.filter(a => a.id !== best.id));
+    this.selectedIds.update(set => withoutIds(set, [best.id]));
+    this.savingIds.update(set => withoutIds(set, [best.id]));
+    toast.update(1, total);
+
+    const restIds = rest.map(a => a.id);
+    this.deletingIds.update(set => new Set([...set, ...restIds]));
+    const result = await runChunked(restIds, chunk => this.service.bulkDelete(chunk), {
+      onChunkDone: (chunk, processed) => {
+        const chunkSet = new Set(chunk);
+        this.articles.update(list => list.filter(a => !chunkSet.has(a.id)));
+        this.selectedIds.update(set => withoutIds(set, chunk));
+        toast.update(processed + 1, total);
       },
     });
+    this.deletingIds.update(set => withoutIds(set, restIds));
+    this.clusterBusyId.set(null);
+
+    if (result.failed === 0) {
+      toast.success(`Best saved, ${result.done} archived`);
+    } else {
+      toast.error(`Best saved, but ${result.failed} failed to archive`);
+    }
+    this.clearFiltersIfViewEmpty();
   }
 
   // Snooze
@@ -1000,6 +1008,7 @@ export class InboxComponent {
       next: () => {
         this.articles.update(list => list.filter(a => a.id !== article.id));
         this.snoozingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
+        this.clearFiltersIfViewEmpty();
       },
       error: () => {
         this.snoozingIds.update(set => { const next = new Set(set); next.delete(article.id); return next; });
