@@ -8,30 +8,53 @@ export interface Cluster {
   label: string;
 }
 
+type TagNormalizer = (tag: string) => string;
+
 /**
- * Folds trivial tag variants (case, whitespace, French plurals) so
- * "prévisions météo" and "prévision météo" count as the same tag.
+ * Builds a tag normalizer for one clustering pass. Case/whitespace variants
+ * always fold; a trailing 's' (French plural) folds ONLY when the singular
+ * form also appears in the article set, so tags that merely end in 's'
+ * ("paris", "temps") don't collapse into unrelated words.
+ *
+ * Note: this folding is display/grouping-only and intentionally looser than
+ * the canonical normalizeTag in @feed-digest/core (lowercase + trim), which
+ * defines tag identity for preference scoring.
  */
-function normalizeTag(tag: string): string {
-  return tag
-    .toLowerCase()
-    .trim()
-    .split(/\s+/)
-    .map(w => (w.length >= 4 && w.endsWith('s') ? w.slice(0, -1) : w))
-    .join(' ');
+function createTagNormalizer(articles: Article[]): TagNormalizer {
+  const vocab = new Set<string>();
+  for (const a of articles) {
+    for (const t of a.tags) {
+      for (const w of t.toLowerCase().trim().split(/\s+/)) vocab.add(w);
+    }
+  }
+
+  const cache = new Map<string, string>();
+  return (tag: string): string => {
+    let norm = cache.get(tag);
+    if (norm === undefined) {
+      norm = tag
+        .toLowerCase()
+        .trim()
+        .split(/\s+/)
+        .map(w => (w.length >= 4 && w.endsWith('s') && vocab.has(w.slice(0, -1)) ? w.slice(0, -1) : w))
+        .join(' ');
+      cache.set(tag, norm);
+    }
+    return norm;
+  };
 }
 
 /**
  * Builds a Cluster object from a list of articles.
  */
-function buildCluster(articles: Article[]): Cluster {
+function buildCluster(articles: Article[], normalize: TagNormalizer): Cluster {
   // Count by normalized form so plural/case variants pool together,
   // and display each tag's most frequent raw spelling.
   const tagCounts = new Map<string, number>();
   const rawCounts = new Map<string, Map<string, number>>();
   for (const a of articles) {
     for (const t of a.tags) {
-      const norm = normalizeTag(t);
+      const norm = normalize(t);
       tagCounts.set(norm, (tagCounts.get(norm) || 0) + 1);
       let raws = rawCounts.get(norm);
       if (!raws) {
@@ -63,16 +86,24 @@ function buildCluster(articles: Article[]): Cluster {
 /**
  * Greedy dominant-tag clustering. Repeatedly takes the most frequent tag
  * among unassigned articles and forms a cluster from its articles;
- * oversized groups are narrowed by the most frequent co-occurring tag
- * (also used to honor minSharedTags coherence), then capped to the
- * newest maxArticles. Leftovers stay in the pool for later tags, so
- * coverage stays high: every article whose tag is shared by at least
- * minArticles others ends up in some cluster.
+ * oversized groups are narrowed by the most frequent co-occurring tag,
+ * then capped to the newest maxArticles. A dominant tag whose group can't
+ * reach minSharedTags shared tags is retired instead of emitted, so every
+ * emitted cluster honors the configured coherence bound. Leftovers stay in
+ * the pool for later tags, so coverage stays high.
  */
 export function clusterArticles(articles: Article[], config: ClusterConfig): Cluster[] {
   if (articles.length === 0) return [];
 
-  const normTags = articles.map(a => [...new Set(a.tags.map(normalizeTag))]);
+  // Guard against unvalidated config (cleared/0 inputs): maxArticles of 0
+  // would otherwise loop forever below since no article ever gets assigned,
+  // and minArticles of 1 floods the view with singleton "clusters".
+  const minSharedTags = Math.max(1, Math.floor(config.minSharedTags) || 1);
+  const minArticles = Math.max(2, Math.floor(config.minArticles) || 2);
+  const maxArticles = Math.max(minArticles, Math.floor(config.maxArticles) || 50);
+
+  const normalize = createTagNormalizer(articles);
+  const normTags = articles.map(a => [...new Set(a.tags.map(normalize))]);
   const assigned = new Array<boolean>(articles.length).fill(false);
   const clusters: Cluster[] = [];
 
@@ -105,10 +136,13 @@ export function clusterArticles(articles: Article[], config: ClusterConfig): Clu
     new Date(articles[b].publishedAt).getTime() - new Date(articles[a].publishedAt).getTime();
 
   const allIndices = articles.map((_, i) => i);
+  // Dominant tags that couldn't reach minSharedTags coherence — retired so
+  // the loop makes progress and their articles can cluster under other tags.
+  const rejected = new Set<string>();
 
   for (;;) {
-    const top = largestBucket(buildBuckets(allIndices));
-    if (!top || top.indices.length < config.minArticles) break;
+    const top = largestBucket(buildBuckets(allIndices, rejected));
+    if (!top || top.indices.length < minArticles) break;
 
     const seed = new Set([top.tag]);
     let current = top.indices;
@@ -116,18 +150,23 @@ export function clusterArticles(articles: Article[], config: ClusterConfig): Clu
     // Narrow by co-occurring tags while the group is oversized or the
     // articles don't yet share minSharedTags tags. Each pass grows the
     // seed set, so this terminates.
-    while (current.length > config.maxArticles || seed.size < config.minSharedTags) {
+    while (current.length > maxArticles || seed.size < minSharedTags) {
       const sub = largestBucket(buildBuckets(current, seed));
-      if (!sub || sub.indices.length < config.minArticles) break;
+      if (!sub || sub.indices.length < minArticles) break;
       seed.add(sub.tag);
       current = sub.indices;
     }
 
-    if (current.length > config.maxArticles) {
-      current = [...current].sort(byNewest).slice(0, config.maxArticles);
+    if (seed.size < minSharedTags) {
+      rejected.add(top.tag);
+      continue;
+    }
+
+    if (current.length > maxArticles) {
+      current = [...current].sort(byNewest).slice(0, maxArticles);
     }
     for (const i of current) assigned[i] = true;
-    clusters.push(buildCluster(current.map(i => articles[i])));
+    clusters.push(buildCluster(current.map(i => articles[i]), normalize));
   }
 
   return clusters.sort((a, b) => b.articles.length - a.articles.length);
