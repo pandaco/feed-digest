@@ -241,12 +241,14 @@ export class DynamoDbStorage implements StoragePort {
   }
 
   private async deleteFromCollection(articleIds: string[], collection: Collection): Promise<void> {
-    // SK = articleId, so we always know the full key — no pre-query needed
-    const requests = articleIds.map(id => ({
+    // SK = articleId, so we always know the full key — no pre-query needed.
+    // Dedupe: BatchWriteItem rejects duplicate keys within one call.
+    const uniqueIds = [...new Set(articleIds)];
+    const requests = uniqueIds.map(id => ({
       DeleteRequest: { Key: { PK: `${collection}#${id}`, SK: id } },
     }));
     await this.sendBatchedRequests(requests);
-    console.log(`[DynamoDbStorage] Deleted ${articleIds.length} articles from ${collection}`);
+    console.log(`[DynamoDbStorage] Deleted ${uniqueIds.length} articles from ${collection}`);
   }
 
   private async batchWrite(articles: Article[], collection: Collection): Promise<void> {
@@ -256,7 +258,9 @@ export class DynamoDbStorage implements StoragePort {
   }
 
   // BatchWriteCommand caps at 25 requests; run a few batches in parallel and
-  // retry unprocessed items with exponential backoff.
+  // retry unprocessed items with exponential backoff. Every batch is
+  // attempted even when one fails, and any failure is re-thrown at the end
+  // so callers never report success for writes that were dropped.
   private async sendBatchedRequests(allRequests: WriteRequest[]): Promise<void> {
     const batches: WriteRequest[][] = [];
     for (let i = 0; i < allRequests.length; i += 25) {
@@ -264,8 +268,19 @@ export class DynamoDbStorage implements StoragePort {
     }
 
     const concurrency = 4;
+    const failures: unknown[] = [];
     for (let i = 0; i < batches.length; i += concurrency) {
-      await Promise.all(batches.slice(i, i + concurrency).map(batch => this.sendBatchWithRetry(batch)));
+      const results = await Promise.allSettled(
+        batches.slice(i, i + concurrency).map(batch => this.sendBatchWithRetry(batch))
+      );
+      for (const r of results) {
+        if (r.status === 'rejected') failures.push(r.reason);
+      }
+    }
+
+    if (failures.length > 0) {
+      console.error(`[DynamoDbStorage] ${failures.length} of ${batches.length} batches failed`, failures[0]);
+      throw failures[0];
     }
   }
 
@@ -282,6 +297,9 @@ export class DynamoDbStorage implements StoragePort {
         retries++;
         await new Promise(r => setTimeout(r, Math.pow(2, retries) * 100));
       }
+    }
+    if (requests.length > 0) {
+      throw new Error(`[DynamoDbStorage] BatchWrite gave up after ${retries} retries with ${requests.length} unprocessed requests`);
     }
   }
 }
