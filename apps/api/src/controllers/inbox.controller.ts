@@ -36,6 +36,17 @@ export class InboxController {
     this.chatId = process.env['TELEGRAM_CHAT_ID'] || '';
   }
 
+  // Fast path when the adapter supports direct key lookups; otherwise
+  // fall back to scanning the whole inbox collection.
+  private async getInboxArticlesByIds(articleIds: string[]): Promise<Article[]> {
+    if (this.storage.getFromInboxByIds) {
+      return this.storage.getFromInboxByIds(articleIds);
+    }
+    const idSet = new Set(articleIds);
+    const allArticles = await this.storage.getFromInbox();
+    return allArticles.filter(a => idSet.has(a.id));
+  }
+
   @Get()
   async getInbox() {
     try {
@@ -184,20 +195,16 @@ export class InboxController {
     }
     try {
       // Mass cleanups (skipTagFeedback) shouldn't count as a negative signal
-      // on every deleted tag — and skipping also avoids the full inbox scan.
-      if (this.chatId && !skipTagFeedback) {
-        const idSet = new Set(articleIds);
-        const allArticles = await this.storage.getFromInbox();
-        const toDelete = allArticles.filter(a => idSet.has(a.id));
-        await this.storage.deleteFromInbox(articleIds);
-        if (toDelete.length > 0) {
-          const selections = tagsToSelections(toDelete, false);
-          if (Object.keys(selections).length > 0) {
-            await this.tagPreference.record(this.chatId, selections).catch(() => undefined);
-          }
+      // on every deleted tag — and skipping also avoids the article lookup.
+      const toDelete = this.chatId && !skipTagFeedback
+        ? await this.getInboxArticlesByIds(articleIds)
+        : [];
+      await this.storage.deleteFromInbox(articleIds);
+      if (toDelete.length > 0) {
+        const selections = tagsToSelections(toDelete, false);
+        if (Object.keys(selections).length > 0) {
+          await this.tagPreference.record(this.chatId, selections).catch(() => undefined);
         }
-      } else {
-        await this.storage.deleteFromInbox(articleIds);
       }
       return { deleted: articleIds.length };
     } catch (error) {
@@ -213,14 +220,20 @@ export class InboxController {
       throw new HttpException('articleIds must be a non-empty array', HttpStatus.BAD_REQUEST);
     }
     try {
-      const idSet = new Set(articleIds);
-      const allArticles = await this.storage.getFromInbox();
-      const toSave = allArticles.filter(a => idSet.has(a.id));
+      const toSave = await this.getInboxArticlesByIds(articleIds);
       if (toSave.length === 0) {
         throw new HttpException('No matching articles found in inbox', HttpStatus.NOT_FOUND);
       }
       await this.storage.appendToSaved(toSave.map(a => ({ ...a, isSaved: true })));
-      await this.storage.deleteFromInbox(toSave.map(a => a.id));
+      const savedIds = toSave.map(a => a.id);
+      try {
+        await this.storage.deleteFromInbox(savedIds);
+      } catch (err) {
+        // The articles are already in SAVED; retry the inbox delete once so
+        // a transient failure doesn't leave them visible in both views.
+        console.warn('[API] deleteFromInbox failed after save, retrying once:', err);
+        await this.storage.deleteFromInbox(savedIds);
+      }
       if (this.chatId) {
         const selections = tagsToSelections(toSave, true);
         if (Object.keys(selections).length > 0) {
@@ -245,8 +258,7 @@ export class InboxController {
       throw new HttpException('snoozedUntil is required (ISO 8601 date)', HttpStatus.BAD_REQUEST);
     }
     try {
-      const articles = await this.storage.getFromInbox();
-      const article = articles.find(a => a.id === articleId);
+      const [article] = await this.getInboxArticlesByIds([articleId]);
       if (!article) {
         throw new HttpException('Article not found', HttpStatus.NOT_FOUND);
       }
@@ -262,8 +274,7 @@ export class InboxController {
   @Post(':articleId/unsnooze')
   async unsnooze(@Param('articleId') articleId: string) {
     try {
-      const articles = await this.storage.getFromInbox();
-      const article = articles.find(a => a.id === articleId);
+      const [article] = await this.getInboxArticlesByIds([articleId]);
       if (!article) {
         throw new HttpException('Article not found', HttpStatus.NOT_FOUND);
       }
@@ -279,8 +290,7 @@ export class InboxController {
   @Delete(':articleId')
   async deleteInbox(@Param('articleId') articleId: string) {
     try {
-      const allArticles = await this.storage.getFromInbox();
-      const article = allArticles.find(a => a.id === articleId);
+      const [article] = await this.getInboxArticlesByIds([articleId]);
       await this.storage.deleteFromInbox([articleId]);
       if (this.chatId && article) {
         const selections = tagsToSelections([article], false);

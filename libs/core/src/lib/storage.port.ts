@@ -15,6 +15,13 @@ export interface StoragePort {
   getFromInbox(): Promise<Article[]>;
 
   /**
+   * Get specific inbox articles by id. Optional fast path for adapters that
+   * can look up keys directly; callers must fall back to filtering
+   * getFromInbox() when unimplemented. Missing ids are silently omitted.
+   */
+  getFromInboxByIds?(articleIds: string[]): Promise<Article[]>;
+
+  /**
    * Delete articles from the inbox.
    * Usually called after user filtering in Telegram.
    */

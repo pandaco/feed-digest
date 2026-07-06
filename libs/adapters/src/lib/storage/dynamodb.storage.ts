@@ -2,6 +2,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
   QueryCommand,
+  BatchGetCommand,
   BatchWriteCommand,
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
@@ -37,6 +38,35 @@ export class DynamoDbStorage implements StoragePort {
 
   async getFromInbox(): Promise<Article[]> {
     return this.queryCollection('INBOX');
+  }
+
+  async getFromInboxByIds(articleIds: string[]): Promise<Article[]> {
+    const uniqueIds = [...new Set(articleIds)];
+    const articles: Article[] = [];
+
+    // BatchGetCommand caps at 100 keys per call.
+    for (let i = 0; i < uniqueIds.length; i += 100) {
+      let keys = uniqueIds.slice(i, i + 100).map(id => ({ PK: `INBOX#${id}`, SK: id }));
+      let retries = 0;
+      while (keys.length > 0) {
+        const result = await this.docClient.send(
+          new BatchGetCommand({ RequestItems: { [this.tableName]: { Keys: keys } } })
+        );
+        for (const item of result.Responses?.[this.tableName] ?? []) {
+          articles.push(this.itemToArticle(item as Record<string, unknown>, 'INBOX'));
+        }
+        keys = (result.UnprocessedKeys?.[this.tableName]?.Keys ?? []) as typeof keys;
+        if (keys.length > 0) {
+          if (retries >= 5) {
+            throw new Error(`[DynamoDbStorage] BatchGet gave up after 5 retries with ${keys.length} unprocessed keys`);
+          }
+          retries++;
+          await new Promise(r => setTimeout(r, Math.pow(2, retries) * 100));
+        }
+      }
+    }
+
+    return articles;
   }
 
   async deleteFromInbox(articleIds: string[]): Promise<void> {
