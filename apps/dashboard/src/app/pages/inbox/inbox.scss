@@ -597,6 +597,22 @@ kbd {
   z-index: 10;
 }
 
+// Sticky table header — sticks below the sticky .bulk-bar when a selection
+// is active (two sticky siblings at the same top would overlap otherwise),
+// or to the very top when there's no selection.
+$bulk-bar-height: 3rem;
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  background: var(--bg-surface);
+}
+
+.has-bulk-bar thead th {
+  top: $bulk-bar-height;
+}
+
 .result-count {
   padding: 0.5rem 1.25rem;
   font-size: 0.8rem;

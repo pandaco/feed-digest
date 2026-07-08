@@ -86,7 +86,7 @@
     </div>
 
     <!-- Table -->
-    <section class="table-section">
+    <section class="table-section" [class.has-bulk-bar]="selectedCount() > 0">
       <div class="table-header">
         <div class="filter-tabs" role="tablist" aria-label="Filter by importance">
           <button class="filter-tab" role="tab" [attr.aria-selected]="importanceFilter() === 'all'" [class.active]="importanceFilter() === 'all'" (click)="setImportanceFilter('all')">
