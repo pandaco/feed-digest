@@ -5,6 +5,7 @@ import { InboxService, Article } from '../../services/inbox.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { formatDate } from '../../shared/format';
+import { importanceTooltip } from '../../shared/article-list.utils';
 
 @Component({
   selector: 'app-triage',
@@ -108,6 +109,7 @@ export class TriageComponent {
   });
 
   formatDate = formatDate;
+  importanceTooltip = importanceTooltip;
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   tagBadgeClass(_tag: string): string {

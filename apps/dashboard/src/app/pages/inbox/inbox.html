@@ -558,7 +558,8 @@
                 [class.row-selected]="isSelected(article.id)"
                 [class.row-focused]="focusedIndex() === i"
                 [class.row-deleting]="isBusy(article.id)"
-                [attr.data-row-index]="i">
+                [attr.data-row-index]="i"
+                [title]="importanceTooltip(article.importance)">
               <td class="col-check">
                 <input
                   type="checkbox"

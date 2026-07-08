@@ -58,7 +58,7 @@
   }
 
   @if (currentArticle(); as article) {
-    <div class="triage-card" [class]="'card-importance-' + article.importance">
+    <div class="triage-card" [class]="'card-importance-' + article.importance" [title]="importanceTooltip(article.importance)">
       <div class="card-header">
         <a class="card-title" [href]="article.url" target="_blank" rel="noopener">{{ article.title }}</a>
         <span class="card-source">{{ article.feedSource }}</span>

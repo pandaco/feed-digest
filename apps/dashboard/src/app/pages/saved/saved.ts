@@ -9,7 +9,7 @@ import { runBulkOp, MASS_ACTION_THRESHOLD } from '../../shared/bulk-actions';
 import { formatDate } from '../../shared/format';
 import {
   ImportanceFilter, SortField, SortDirection, COLLAPSED_TAG_LIMIT, PAGE_SIZE,
-  applyStructuralFilters, searchAndSort, countByField, countTags,
+  applyStructuralFilters, searchAndSort, countByField, countTags, importanceTooltip,
 } from '../../shared/article-list.utils';
 
 @Component({
@@ -346,4 +346,5 @@ export class SavedComponent {
   }
 
   formatDate = formatDate;
+  importanceTooltip = importanceTooltip;
 }

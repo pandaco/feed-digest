@@ -15,16 +15,10 @@ import { getSnoozePresets, SnoozePreset } from '../../shared/snooze.utils';
 import { clusterArticles, getUnclusteredArticles, Cluster } from '../../shared/clustering.utils';
 import {
   ImportanceFilter, SortField, SortDirection, COLLAPSED_TAG_LIMIT, PAGE_SIZE,
-  applyStructuralFilters, searchAndSort, countByField, countTags,
+  applyStructuralFilters, searchAndSort, countByField, countTags, importanceTooltip,
 } from '../../shared/article-list.utils';
 
 type TimeGranularity = 'day' | 'week' | 'month' | 'year';
-
-const IMPORTANCE_TOOLTIP: Record<string, string> = {
-  high: 'High importance: breaking news, major announcements, or critical industry changes that require immediate attention',
-  medium: 'Medium importance: notable developments, significant updates, or interesting analyses worth reading',
-  low: 'Low importance: general news, minor updates, or niche topics with limited broader impact',
-};
 
 @Component({
   selector: 'app-inbox',
@@ -353,10 +347,6 @@ export class InboxComponent {
     if (state === 'auto') return 'badge badge-tag-auto';
     if (state === 'filtered') return 'badge badge-tag-filtered';
     return 'badge badge-tag';
-  }
-
-  importanceTooltip(level: string): string {
-    return IMPORTANCE_TOOLTIP[level] || '';
   }
 
   // Source filter
@@ -1022,4 +1012,5 @@ export class InboxComponent {
   }
 
   formatDate = formatDate;
+  importanceTooltip = importanceTooltip;
 }

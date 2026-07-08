@@ -235,7 +235,8 @@
           @for (article of paginatedArticles(); track article.id) {
             <tr [class]="'row-importance-' + article.importance"
                 [class.row-selected]="isSelected(article.id)"
-                [class.row-deleting]="isDeleting(article.id)">
+                [class.row-deleting]="isDeleting(article.id)"
+                [title]="importanceTooltip(article.importance)">
               <td class="col-check">
                 <input
                   type="checkbox"

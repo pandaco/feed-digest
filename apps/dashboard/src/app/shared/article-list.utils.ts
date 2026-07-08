@@ -11,6 +11,16 @@ export interface TagWithCount {
 
 export const IMPORTANCE_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
+export const IMPORTANCE_TOOLTIP: Record<string, string> = {
+  high: 'High importance: breaking news, major announcements, or critical industry changes that require immediate attention',
+  medium: 'Medium importance: notable developments, significant updates, or interesting analyses worth reading',
+  low: 'Low importance: general news, minor updates, or niche topics with limited broader impact',
+};
+
+export function importanceTooltip(level: string): string {
+  return IMPORTANCE_TOOLTIP[level] || '';
+}
+
 export const COLLAPSED_TAG_LIMIT = 8;
 export const PAGE_SIZE = 50;
 
