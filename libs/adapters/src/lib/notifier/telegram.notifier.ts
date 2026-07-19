@@ -1,8 +1,8 @@
-import TelegramBot from 'node-telegram-bot-api';
+// import TelegramBot from 'node-telegram-bot-api';
 import { NotifierPort, RunSummary } from '@feed-digest/core';
 
 export class TelegramNotifier implements NotifierPort {
-  private bot: TelegramBot;
+  // private bot: TelegramBot;
   private chatId: string;
 
   private readonly messages: Record<string, any> = {
@@ -31,7 +31,7 @@ export class TelegramNotifier implements NotifierPort {
   };
 
   constructor(config: { token: string; chatId: string }) {
-    this.bot = new TelegramBot(config.token);
+    // this.bot = new TelegramBot(config.token);
     this.chatId = config.chatId;
   }
 
@@ -97,7 +97,8 @@ export class TelegramNotifier implements NotifierPort {
     }
     message += `🏷 ${i18n.tagsIdentified} : ${Object.keys(summary.tagCounts).length}`;
 
-    await this.bot.sendMessage(this.chatId, message, { parse_mode: 'HTML' });
+    console.log(message);
+    // await this.bot.sendMessage(this.chatId, message, { parse_mode: 'HTML' });
   }
 
   async sendSourceStats(sourceCounts: Record<string, number>, language: string): Promise<void> {
@@ -114,7 +115,8 @@ export class TelegramNotifier implements NotifierPort {
       message += line;
     }
 
-    await this.bot.sendMessage(this.chatId, message, { parse_mode: 'HTML' });
+    console.log(message);
+    // await this.bot.sendMessage(this.chatId, message, { parse_mode: 'HTML' });
   }
 
   async sendSynthesis(synthesis: string, language: string): Promise<void> {
@@ -123,15 +125,17 @@ export class TelegramNotifier implements NotifierPort {
 
     const message = `<b>${i18n.trendingTopics}</b>\n\n${synth}`;
 
-    await this.bot.sendMessage(this.chatId, message, {
+    console.log(message);
+    /* await this.bot.sendMessage(this.chatId, message, {
       parse_mode: 'HTML',
       disable_web_page_preview: true
-    });
+    }); */
   }
 
   async sendError(message: string, language: string): Promise<void> {
     const i18n = this.messages[language] || this.messages['fr'];
-    await this.bot.sendMessage(this.chatId, i18n.error(message));
+    console.log(i18n.error(message));
+    // await this.bot.sendMessage(this.chatId, i18n.error(message));
   }
 
   private formatNumber(n: number): string {
